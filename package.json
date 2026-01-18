@@ -1,0 +1,73 @@
+{
+  "name": "schoolos",
+  "version": "0.1.0",
+  "private": true,
+  "description": "SchoolOS - AI-first school operating system platform",
+  "license": "PROPRIETARY",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-org/schoolos.git"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  },
+  "packageManager": "npm@10.2.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "services/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev --parallel",
+    "dev:api": "turbo run dev --filter=@schoolos/api",
+    "dev:web": "turbo run dev --filter=@schoolos/web",
+    "build": "turbo run build",
+    "build:api": "turbo run build --filter=@schoolos/api",
+    "build:web": "turbo run build --filter=@schoolos/web",
+    "start:api": "npm run start --workspace=@schoolos/api",
+    "test": "turbo run test",
+    "test:watch": "turbo run test:watch",
+    "test:cov": "turbo run test:cov",
+    "test:e2e": "turbo run test:e2e",
+    "lint": "turbo run lint",
+    "lint:fix": "turbo run lint:fix",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "typecheck": "turbo run typecheck",
+    "clean": "turbo run clean && rm -rf node_modules",
+    "db:generate": "npm run db:generate --workspace=@schoolos/database",
+    "db:migrate": "npm run db:migrate --workspace=@schoolos/database",
+    "db:migrate:dev": "npm run db:migrate:dev --workspace=@schoolos/database",
+    "db:push": "npm run db:push --workspace=@schoolos/database",
+    "db:seed": "npm run db:seed --workspace=@schoolos/database",
+    "db:reset": "npm run db:reset --workspace=@schoolos/database",
+    "db:studio": "npm run db:studio --workspace=@schoolos/database",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:logs": "docker-compose logs -f",
+    "docker:reset": "docker-compose down -v && docker-compose up -d",
+    "prepare": "husky install",
+    "preinstall": "npx only-allow npm"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^18.4.3",
+    "@commitlint/config-conventional": "^18.4.3",
+    "@types/node": "^20.10.0",
+    "eslint": "^8.55.0",
+    "husky": "^8.0.3",
+    "lint-staged": "^15.2.0",
+    "prettier": "^3.1.1",
+    "turbo": "^1.11.2",
+    "typescript": "^5.3.3"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,yml,yaml}": [
+      "prettier --write"
+    ]
+  }
+}

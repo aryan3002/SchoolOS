@@ -1,0 +1,108 @@
+/**
+ * Relationships DTOs
+ */
+
+import {
+  IsOptional,
+  IsEnum,
+  IsUUID,
+  IsNumber,
+  IsBoolean,
+  IsObject,
+  IsArray,
+  ValidateNested,
+  Min,
+  Max,
+  ArrayMinSize,
+  ArrayMaxSize,
+} from 'class-validator';
+import { Type } from 'class-transformer';
+import { RelationshipType, RelationshipStatus } from '@prisma/client';
+
+export class CreateRelationshipDto {
+  @IsUUID('4', { message: 'Invalid primary user ID' })
+  userId!: string;
+
+  @IsUUID('4', { message: 'Invalid related user ID' })
+  relatedUserId!: string;
+
+  @IsEnum(RelationshipType, { message: 'Invalid relationship type' })
+  relationshipType!: RelationshipType;
+
+  @IsOptional()
+  @IsBoolean()
+  isPrimary?: boolean;
+
+  @IsOptional()
+  @IsObject()
+  metadata?: Record<string, unknown>;
+}
+
+export class UpdateRelationshipDto {
+  @IsOptional()
+  @IsEnum(RelationshipStatus, { message: 'Invalid relationship status' })
+  status?: RelationshipStatus;
+
+  @IsOptional()
+  @IsBoolean()
+  isPrimary?: boolean;
+
+  @IsOptional()
+  @IsObject()
+  metadata?: Record<string, unknown>;
+}
+
+export class ListRelationshipsQueryDto {
+  @IsOptional()
+  @IsUUID('4', { message: 'Invalid user ID' })
+  userId?: string;
+
+  @IsOptional()
+  @IsEnum(RelationshipType, { message: 'Invalid relationship type' })
+  relationshipType?: string;
+
+  @IsOptional()
+  @IsEnum(RelationshipStatus, { message: 'Invalid relationship status' })
+  status?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(1)
+  page?: number = 1;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(1)
+  @Max(100)
+  pageSize?: number = 20;
+}
+
+export class BulkCreateRelationshipItemDto {
+  @IsUUID('4', { message: 'Invalid primary user ID' })
+  userId!: string;
+
+  @IsUUID('4', { message: 'Invalid related user ID' })
+  relatedUserId!: string;
+
+  @IsEnum(RelationshipType, { message: 'Invalid relationship type' })
+  relationshipType!: RelationshipType;
+
+  @IsOptional()
+  @IsBoolean()
+  isPrimary?: boolean;
+
+  @IsOptional()
+  @IsObject()
+  metadata?: Record<string, unknown>;
+}
+
+export class BulkCreateRelationshipsDto {
+  @IsArray()
+  @ValidateNested({ each: true })
+  @ArrayMinSize(1)
+  @ArrayMaxSize(1000)
+  @Type(() => BulkCreateRelationshipItemDto)
+  relationships!: BulkCreateRelationshipItemDto[];
+}

@@ -1,0 +1,393 @@
+/**
+ * Knowledge Controller
+ *
+ * REST API endpoints for knowledge management:
+ * - Document upload and ingestion
+ * - Processing status tracking
+ * - Hybrid search
+ * - Source lifecycle management
+ *
+ * All endpoints are protected by JWT authentication and
+ * multi-tenant district isolation.
+ */
+
+import {
+  Controller,
+  Post,
+  Get,
+  Put,
+  Delete,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+  UseInterceptors,
+  UploadedFile,
+  ParseFilePipe,
+  MaxFileSizeValidator,
+  FileTypeValidator,
+  HttpCode,
+  HttpStatus,
+  BadRequestException,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { KnowledgeSourceStatus, KnowledgeSourceType } from '@prisma/client';
+
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { DistrictId } from '../common/decorators/district-id.decorator';
+import { KnowledgeService } from './knowledge.service';
+import { HybridSearchService } from './search';
+import { DocumentMetadata, KnowledgeSourceFilters } from './types';
+import { HybridSearchOptions, SearchFilters } from './search/types';
+
+// File type for multer
+interface MulterFile {
+  fieldname: string;
+  originalname: string;
+  encoding: string;
+  mimetype: string;
+  size: number;
+  buffer: Buffer;
+}
+
+// DTOs for request/response
+class UploadDocumentDto {
+  title!: string;
+  description?: string;
+  documentType!: KnowledgeSourceType;
+  category?: string;
+  tags?: string[];
+  expiresAt?: Date;
+}
+
+class UpdateSourceDto {
+  title?: string;
+  description?: string;
+  category?: string;
+  tags?: string[];
+  expiresAt?: Date;
+}
+
+class SearchQueryDto {
+  query!: string;
+  limit?: number;
+  offset?: number;
+  sourceTypes?: string[];
+  categories?: string[];
+  tags?: string[];
+  sourceIds?: string[];
+  vectorWeight?: number;
+  useReranking?: boolean;
+  minScore?: number;
+}
+
+class ListSourcesQueryDto {
+  page?: number;
+  pageSize?: number;
+  status?: KnowledgeSourceStatus;
+  sourceType?: KnowledgeSourceType;
+  category?: string;
+  tags?: string;
+  searchQuery?: string;
+  createdAfter?: string;
+  createdBefore?: string;
+}
+
+@Controller('knowledge')
+@UseGuards(JwtAuthGuard)
+export class KnowledgeController {
+  constructor(
+    private readonly knowledgeService: KnowledgeService,
+    private readonly searchService: HybridSearchService,
+  ) {}
+
+  @Post('sources/upload')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadDocument(
+    @UploadedFile(
+      new ParseFilePipe({
+        validators: [
+          new MaxFileSizeValidator({ maxSize: 50 * 1024 * 1024 }), // 50MB
+          new FileTypeValidator({
+            fileType: /(pdf|msword|openxmlformats|text|html|markdown)/,
+          }),
+        ],
+        fileIsRequired: true,
+      }),
+    )
+    file: MulterFile,
+    @Body() body: UploadDocumentDto,
+    @CurrentUser('id') userId: string,
+    @DistrictId() districtId: string,
+  ) {
+    const metadata: DocumentMetadata = {
+      title: body.title,
+      mimeType: file.mimetype,
+      filename: file.originalname,
+      documentType: body.documentType,
+    };
+
+    if (body.description) metadata.description = body.description;
+    if (body.category) metadata.category = body.category;
+    if (body.tags) metadata.tags = body.tags;
+    if (body.expiresAt) metadata.expiresAt = body.expiresAt;
+
+    const source = await this.knowledgeService.ingestDocument(
+      file.buffer,
+      metadata,
+      districtId,
+      userId,
+    );
+
+    return {
+      success: true,
+      data: {
+        id: source.id,
+        title: source.title,
+        status: source.status,
+        message: 'Document uploaded. Processing has started.',
+      },
+    };
+  }
+
+  @Get('sources/:id/status')
+  async getProcessingStatus(
+    @Param('id') sourceId: string,
+    @DistrictId() districtId: string,
+  ) {
+    // Verify source belongs to district
+    const source = await this.knowledgeService.getSource(sourceId, districtId);
+    const status = this.knowledgeService.getProcessingStatus(sourceId);
+
+    return {
+      success: true,
+      data: {
+        sourceId: source.id,
+        title: source.title,
+        sourceStatus: source.status,
+        processing: status ?? {
+          status: source.processedAt ? 'COMPLETED' : 'UNKNOWN',
+          progress: source.processedAt ? 100 : 0,
+        },
+      },
+    };
+  }
+
+  @Post('search')
+  @HttpCode(HttpStatus.OK)
+  async search(
+    @Body() body: SearchQueryDto,
+    @DistrictId() districtId: string,
+  ) {
+    if (!body.query || body.query.trim().length < 2) {
+      throw new BadRequestException('Query must be at least 2 characters');
+    }
+
+    const filters: SearchFilters = {};
+    if (body.sourceTypes) filters.sourceTypes = body.sourceTypes;
+    if (body.categories) filters.categories = body.categories;
+    if (body.tags) filters.tags = body.tags;
+    if (body.sourceIds) filters.sourceIds = body.sourceIds;
+
+    const options: HybridSearchOptions = {
+      query: body.query,
+      districtId,
+      limit: Math.min(body.limit ?? 10, 50), // Max 50 results
+      offset: body.offset ?? 0,
+      filters,
+    };
+
+    if (body.vectorWeight !== undefined) options.vectorWeight = body.vectorWeight;
+    if (body.useReranking !== undefined) options.useReranking = body.useReranking;
+    if (body.minScore !== undefined) options.minScore = body.minScore;
+
+    const results = await this.searchService.search(options);
+
+    return {
+      success: true,
+      data: {
+        query: results.query,
+        total: results.total,
+        results: results.results.map((r) => ({
+          chunkId: r.chunkId,
+          sourceId: r.sourceId,
+          content: r.content,
+          score: r.combinedScore,
+          highlights: r.highlights,
+          metadata: r.metadata,
+        })),
+        timing: results.timing,
+      },
+    };
+  }
+
+  @Get('sources')
+  async listSources(
+    @Query() query: ListSourcesQueryDto,
+    @DistrictId() districtId: string,
+  ) {
+    const filters: KnowledgeSourceFilters = {};
+    if (query.status) filters.status = query.status;
+    if (query.sourceType) filters.sourceType = query.sourceType;
+    if (query.category) filters.category = query.category;
+    if (query.tags) filters.tags = query.tags.split(',').map((t) => t.trim());
+    if (query.searchQuery) filters.searchQuery = query.searchQuery;
+    if (query.createdAfter) filters.createdAfter = new Date(query.createdAfter);
+    if (query.createdBefore) filters.createdBefore = new Date(query.createdBefore);
+
+    const result = await this.knowledgeService.listSources(
+      districtId,
+      filters,
+      query.page ?? 1,
+      Math.min(query.pageSize ?? 20, 100),
+    );
+
+    return {
+      success: true,
+      data: {
+        items: result.items.map((source) => ({
+          id: source.id,
+          title: source.title,
+          description: source.description,
+          sourceType: source.sourceType,
+          status: source.status,
+          category: source.category,
+          tags: source.tags,
+          fileSize: source.fileSize,
+          createdAt: source.createdAt,
+          processedAt: source.processedAt,
+          publishedAt: source.publishedAt,
+        })),
+        pagination: {
+          page: result.page,
+          pageSize: result.pageSize,
+          total: result.total,
+          totalPages: result.totalPages,
+        },
+      },
+    };
+  }
+
+  @Get('sources/:id')
+  async getSource(
+    @Param('id') sourceId: string,
+    @DistrictId() districtId: string,
+  ) {
+    const source = await this.knowledgeService.getSource(sourceId, districtId);
+
+    return {
+      success: true,
+      data: source,
+    };
+  }
+
+  @Put('sources/:id')
+  async updateSource(
+    @Param('id') sourceId: string,
+    @Body() body: UpdateSourceDto,
+    @CurrentUser('id') userId: string,
+    @DistrictId() districtId: string,
+  ) {
+    const updated = await this.knowledgeService.updateSource(
+      sourceId,
+      districtId,
+      userId,
+      body,
+    );
+
+    return {
+      success: true,
+      data: updated,
+    };
+  }
+
+  @Post('sources/:id/publish')
+  @HttpCode(HttpStatus.OK)
+  async publishSource(
+    @Param('id') sourceId: string,
+    @CurrentUser('id') userId: string,
+    @DistrictId() districtId: string,
+  ) {
+    const source = await this.knowledgeService.publishSource(sourceId, districtId, userId);
+
+    return {
+      success: true,
+      data: {
+        id: source.id,
+        status: source.status,
+        publishedAt: source.publishedAt,
+        message: 'Source published successfully',
+      },
+    };
+  }
+
+  @Post('sources/:id/archive')
+  @HttpCode(HttpStatus.OK)
+  async archiveSource(
+    @Param('id') sourceId: string,
+    @CurrentUser('id') userId: string,
+    @DistrictId() districtId: string,
+  ) {
+    const source = await this.knowledgeService.archiveSource(sourceId, districtId, userId);
+
+    return {
+      success: true,
+      data: {
+        id: source.id,
+        status: source.status,
+        message: 'Source archived successfully',
+      },
+    };
+  }
+
+  @Delete('sources/:id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async deleteSource(
+    @Param('id') sourceId: string,
+    @CurrentUser('id') userId: string,
+    @DistrictId() districtId: string,
+  ) {
+    await this.knowledgeService.deleteSource(sourceId, districtId, userId);
+  }
+
+  @Get('sources/:id/chunks')
+  async getChunks(
+    @Param('id') sourceId: string,
+    @DistrictId() districtId: string,
+  ) {
+    const chunks = await this.knowledgeService.getChunks(sourceId, districtId);
+
+    return {
+      success: true,
+      data: {
+        sourceId,
+        totalChunks: chunks.length,
+        chunks: chunks.map((chunk) => ({
+          id: chunk.id,
+          chunkIndex: chunk.chunkIndex,
+          content: chunk.content,
+          metadata: chunk.metadata,
+        })),
+      },
+    };
+  }
+
+  @Get('chunks/:id/similar')
+  async findSimilarChunks(
+    @Param('id') chunkId: string,
+    @Query('limit') limit: number = 5,
+    @DistrictId() districtId: string,
+  ) {
+    const similar = await this.searchService.findSimilarChunks(
+      chunkId,
+      districtId,
+      Math.min(limit, 20),
+    );
+
+    return {
+      success: true,
+      data: similar,
+    };
+  }
+}

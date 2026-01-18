@@ -1,0 +1,130 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database with pgvector extension
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: schoolos-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: schoolos
+      POSTGRES_PASSWORD: schoolos_dev_password
+      POSTGRES_DB: schoolos
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./tools/scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U schoolos -d schoolos']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - schoolos-network
+
+  # Redis for caching and sessions
+  redis:
+    image: redis:7-alpine
+    container_name: schoolos-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - schoolos-network
+
+  # Redis Commander (development only - web UI for Redis)
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: schoolos-redis-commander
+    restart: unless-stopped
+    environment:
+      REDIS_HOSTS: local:redis:6379
+    ports:
+      - '8081:8081'
+    depends_on:
+      - redis
+    profiles:
+      - dev-tools
+    networks:
+      - schoolos-network
+
+  # pgAdmin (development only - web UI for PostgreSQL)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: schoolos-pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@schoolos.dev
+      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    ports:
+      - '5050:80'
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      - postgres
+    profiles:
+      - dev-tools
+    networks:
+      - schoolos-network
+
+  # Mailhog (development only - email testing)
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: schoolos-mailhog
+    restart: unless-stopped
+    ports:
+      - '1025:1025' # SMTP
+      - '8025:8025' # Web UI
+    profiles:
+      - dev-tools
+    networks:
+      - schoolos-network
+
+  # MinIO (S3-compatible storage for development)
+  minio:
+    image: minio/minio:latest
+    container_name: schoolos-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: schoolos
+      MINIO_ROOT_PASSWORD: schoolos_dev_password
+    ports:
+      - '9000:9000'
+      - '9001:9001'
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:9000/minio/health/live']
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    profiles:
+      - dev-tools
+    networks:
+      - schoolos-network
+
+networks:
+  schoolos-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  pgadmin_data:
+    driver: local
+  minio_data:
+    driver: local
