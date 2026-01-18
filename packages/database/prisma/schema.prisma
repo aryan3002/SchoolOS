@@ -403,9 +403,23 @@ model KnowledgeSource {
   isPublic      Boolean               @default(false) @map("is_public")  // Visible to all district users
   visibleToRoles UserRole[]           @default([]) @map("visible_to_roles")  // Role-based visibility
   
+  // Approval workflow
+  reviewedBy    String?               @map("reviewed_by") @db.Uuid  // User who reviewed
+  reviewedAt    DateTime?             @map("reviewed_at")
+  reviewNotes   String?               @map("review_notes") @db.Text
+  approvedBy    String?               @map("approved_by") @db.Uuid  // User who approved/published
+  approvedAt    DateTime?             @map("approved_at")
+  
   // Validity
   publishedAt   DateTime?             @map("published_at")
   expiresAt     DateTime?             @map("expires_at")
+  
+  // Freshness tracking
+  contentHash   String?               @map("content_hash") @db.VarChar(64)  // SHA-256 of content
+  lastCheckedAt DateTime?             @map("last_checked_at")  // Last time source was checked for updates
+  lastModifiedAt DateTime?            @map("last_modified_at")  // Last time content actually changed
+  checkFrequencyDays Int?             @map("check_frequency_days") @default(30)  // How often to check for updates
+  autoUpdateEnabled Boolean           @default(false) @map("auto_update_enabled")  // Auto-create new version on content change
   
   // Categorization
   category      String?               @db.VarChar(100)  // e.g., "transportation", "academics"
@@ -537,6 +551,9 @@ model Message {
   // Feedback
   rating          Int?          // 1-5 user rating
   feedback        String?       @db.Text  // User feedback text
+  
+  // General metadata for extensibility
+  metadata        Json          @default("{}")  // Intent, citations, tools used, etc.
   
   // Timestamps
   createdAt       DateTime      @default(now()) @map("created_at")

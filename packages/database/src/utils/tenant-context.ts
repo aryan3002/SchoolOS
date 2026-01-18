@@ -109,14 +109,23 @@ export function createTenantContextFromUser(
     userAgent?: string;
   },
 ): TenantContext {
-  return {
+  const context: TenantContext = {
     districtId: user.districtId,
     userId: user.id,
     role: user.role,
-    requestId: requestInfo?.requestId,
-    ipAddress: requestInfo?.ipAddress,
-    userAgent: requestInfo?.userAgent,
   };
+  
+  if (requestInfo?.requestId !== undefined) {
+    context.requestId = requestInfo.requestId;
+  }
+  if (requestInfo?.ipAddress !== undefined) {
+    context.ipAddress = requestInfo.ipAddress;
+  }
+  if (requestInfo?.userAgent !== undefined) {
+    context.userAgent = requestInfo.userAgent;
+  }
+  
+  return context;
 }
 
 /**

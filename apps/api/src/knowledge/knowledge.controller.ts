@@ -38,6 +38,11 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { DistrictId } from '../common/decorators/district-id.decorator';
 import { KnowledgeService } from './knowledge.service';
 import { HybridSearchService } from './search';
+import { 
+  KnowledgeWorkflowService, 
+  KnowledgeFreshnessService, 
+  KnowledgeBulkOperationsService 
+} from './workflow';
 import { DocumentMetadata, KnowledgeSourceFilters } from './types';
 import { HybridSearchOptions, SearchFilters } from './search/types';
 
@@ -100,6 +105,9 @@ export class KnowledgeController {
   constructor(
     private readonly knowledgeService: KnowledgeService,
     private readonly searchService: HybridSearchService,
+    private readonly workflowService: KnowledgeWorkflowService,
+    private readonly freshnessService: KnowledgeFreshnessService,
+    private readonly bulkOperationsService: KnowledgeBulkOperationsService,
   ) {}
 
   @Post('sources/upload')
@@ -388,6 +396,325 @@ export class KnowledgeController {
     return {
       success: true,
       data: similar,
+    };
+  }
+
+  // ========================================
+  // WORKFLOW ENDPOINTS
+  // ========================================
+
+  @Post('sources/:id/submit-review')
+  async submitForReview(
+    @Param('id') sourceId: string,
+    @CurrentUser() user: { id: string },
+    @Body('notes') notes?: string,
+  ) {
+    await this.workflowService.submitForReview({
+      sourceId,
+      userId: user.id,
+      ...(notes !== undefined ? { notes } : {}),
+    });
+
+    return {
+      success: true,
+      message: 'Source submitted for review',
+    };
+  }
+
+  @Post('sources/:id/approve')
+  async approveSource(
+    @Param('id') sourceId: string,
+    @CurrentUser() user: { id: string },
+    @Body('notes') notes?: string,
+  ) {
+    await this.workflowService.approve({
+      sourceId,
+      userId: user.id,
+      ...(notes !== undefined ? { notes } : {}),
+    });
+
+    return {
+      success: true,
+      message: 'Source approved and published',
+    };
+  }
+
+  @Post('sources/:id/reject')
+  async rejectSource(
+    @Param('id') sourceId: string,
+    @CurrentUser() user: { id: string },
+    @Body('notes') notes?: string,
+  ) {
+    await this.workflowService.reject({
+      sourceId,
+      userId: user.id,
+      ...(notes !== undefined ? { notes } : {}),
+    });
+
+    return {
+      success: true,
+      message: 'Source rejected',
+    };
+  }
+
+  @Post('sources/:id/unpublish')
+  async unpublishSource(
+    @Param('id') sourceId: string,
+    @CurrentUser() user: { id: string },
+    @Body('notes') notes?: string,
+  ) {
+    await this.workflowService.unpublish({
+      sourceId,
+      userId: user.id,
+      ...(notes !== undefined ? { notes } : {}),
+    });
+
+    return {
+      success: true,
+      message: 'Source unpublished',
+    };
+  }
+
+  @Get('pending-reviews')
+  async getPendingReviews(@DistrictId() districtId: string) {
+    const pending = await this.workflowService.getPendingReviews(districtId);
+
+    return {
+      success: true,
+      data: {
+        total: pending.length,
+        sources: pending,
+      },
+    };
+  }
+
+  // ========================================
+  // FRESHNESS TRACKING ENDPOINTS
+  // ========================================
+
+  @Get('freshness-status')
+  async getFreshnessStatus(@DistrictId() districtId: string) {
+    const status = await this.freshnessService.getDistrictFreshnessStatus(
+      districtId,
+    );
+
+    return {
+      success: true,
+      data: {
+        total: status.length,
+        fresh: status.filter((s) => s.status === 'fresh').length,
+        stale: status.filter((s) => s.status === 'stale').length,
+        expired: status.filter((s) => s.status === 'expired').length,
+        needsCheck: status.filter((s) => s.status === 'needs_check').length,
+        sources: status,
+      },
+    };
+  }
+
+  @Post('sources/:id/check-freshness')
+  async checkSourceFreshness(@Param('id') sourceId: string) {
+    const result = await this.freshnessService.checkSourceFreshness(sourceId);
+
+    return {
+      success: true,
+      data: result,
+    };
+  }
+
+  @Get('expiring-soon')
+  async getExpiringSources(
+    @DistrictId() districtId: string,
+    @Query('days') days: number = 30,
+  ) {
+    const expiring = await this.freshnessService.getExpiringSources(
+      districtId,
+      days,
+    );
+
+    return {
+      success: true,
+      data: {
+        total: expiring.length,
+        sources: expiring,
+      },
+    };
+  }
+
+  // ========================================
+  // BULK OPERATIONS ENDPOINTS
+  // ========================================
+
+  @Post('bulk/publish')
+  async bulkPublish(
+    @Body('sourceIds') sourceIds: string[],
+    @DistrictId() districtId: string,
+    @CurrentUser() user: { id: string },
+  ) {
+    if (!sourceIds || sourceIds.length === 0) {
+      throw new BadRequestException('No source IDs provided');
+    }
+
+    const result = await this.bulkOperationsService.bulkPublish({
+      sourceIds,
+      districtId,
+      userId: user.id,
+    });
+
+    return {
+      success: result.success,
+      data: result,
+    };
+  }
+
+  @Post('bulk/unpublish')
+  async bulkUnpublish(
+    @Body('sourceIds') sourceIds: string[],
+    @DistrictId() districtId: string,
+    @CurrentUser() user: { id: string },
+  ) {
+    if (!sourceIds || sourceIds.length === 0) {
+      throw new BadRequestException('No source IDs provided');
+    }
+
+    const result = await this.bulkOperationsService.bulkUnpublish({
+      sourceIds,
+      districtId,
+      userId: user.id,
+    });
+
+    return {
+      success: result.success,
+      data: result,
+    };
+  }
+
+  @Post('bulk/archive')
+  async bulkArchive(
+    @Body('sourceIds') sourceIds: string[],
+    @DistrictId() districtId: string,
+    @CurrentUser() user: { id: string },
+  ) {
+    if (!sourceIds || sourceIds.length === 0) {
+      throw new BadRequestException('No source IDs provided');
+    }
+
+    const result = await this.bulkOperationsService.bulkArchive({
+      sourceIds,
+      districtId,
+      userId: user.id,
+    });
+
+    return {
+      success: result.success,
+      data: result,
+    };
+  }
+
+  @Post('bulk/delete')
+  async bulkDelete(
+    @Body('sourceIds') sourceIds: string[],
+    @DistrictId() districtId: string,
+    @CurrentUser() user: { id: string },
+  ) {
+    if (!sourceIds || sourceIds.length === 0) {
+      throw new BadRequestException('No source IDs provided');
+    }
+
+    const result = await this.bulkOperationsService.bulkDelete({
+      sourceIds,
+      districtId,
+      userId: user.id,
+    });
+
+    return {
+      success: result.success,
+      data: result,
+    };
+  }
+
+  @Post('bulk/update-metadata')
+  async bulkUpdateMetadata(
+    @Body() body: {
+      sourceIds: string[];
+      category?: string;
+      tags?: string[];
+      expiresAt?: Date | null;
+      checkFrequencyDays?: number;
+    },
+    @DistrictId() districtId: string,
+    @CurrentUser() user: { id: string },
+  ) {
+    if (!body.sourceIds || body.sourceIds.length === 0) {
+      throw new BadRequestException('No source IDs provided');
+    }
+
+    const result = await this.bulkOperationsService.bulkUpdateMetadata({
+      sourceIds: body.sourceIds,
+      districtId,
+      userId: user.id,
+      ...(body.category !== undefined ? { category: body.category } : {}),
+      ...(body.tags !== undefined ? { tags: body.tags } : {}),
+      ...(body.expiresAt !== undefined ? { expiresAt: body.expiresAt } : {}),
+      ...(body.checkFrequencyDays !== undefined ? { checkFrequencyDays: body.checkFrequencyDays } : {}),
+    });
+
+    return {
+      success: result.success,
+      data: result,
+    };
+  }
+
+  @Post('bulk/add-tags')
+  async bulkAddTags(
+    @Body('sourceIds') sourceIds: string[],
+    @Body('tags') tags: string[],
+    @DistrictId() districtId: string,
+    @CurrentUser() user: { id: string },
+  ) {
+    if (!sourceIds || sourceIds.length === 0) {
+      throw new BadRequestException('No source IDs provided');
+    }
+    if (!tags || tags.length === 0) {
+      throw new BadRequestException('No tags provided');
+    }
+
+    const result = await this.bulkOperationsService.bulkAddTags({
+      sourceIds,
+      districtId,
+      userId: user.id,
+      tags,
+    });
+
+    return {
+      success: result.success,
+      data: result,
+    };
+  }
+
+  @Post('bulk/remove-tags')
+  async bulkRemoveTags(
+    @Body('sourceIds') sourceIds: string[],
+    @Body('tags') tags: string[],
+    @DistrictId() districtId: string,
+    @CurrentUser() user: { id: string },
+  ) {
+    if (!sourceIds || sourceIds.length === 0) {
+      throw new BadRequestException('No source IDs provided');
+    }
+    if (!tags || tags.length === 0) {
+      throw new BadRequestException('No tags provided');
+    }
+
+    const result = await this.bulkOperationsService.bulkRemoveTags({
+      sourceIds,
+      districtId,
+      userId: user.id,
+      tags,
+    });
+
+    return {
+      success: result.success,
+      data: result,
     };
   }
 }

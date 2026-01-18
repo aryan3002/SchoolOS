@@ -4,8 +4,6 @@
  * Standardized pagination helpers for consistent API responses.
  */
 
-import { Prisma } from '@prisma/client';
-
 /**
  * Pagination input parameters
  */
@@ -77,13 +75,24 @@ export function normalizePaginationParams(
   );
   const sortOrder = params.sortOrder ?? 'desc';
 
-  return {
+  const result: Required<Omit<PaginationParams, 'cursor' | 'sortBy' | 'sortOrder'>> & {
+    cursor?: string;
+    sortBy?: string;
+    sortOrder: 'asc' | 'desc';
+  } = {
     page,
     pageSize,
-    cursor: params.cursor,
-    sortBy: params.sortBy,
     sortOrder,
   };
+  
+  if (params.cursor !== undefined) {
+    result.cursor = params.cursor;
+  }
+  if (params.sortBy !== undefined) {
+    result.sortBy = params.sortBy;
+  }
+  
+  return result;
 }
 
 /**
@@ -117,15 +126,20 @@ export function createPaginationMeta(
 ): PaginationMeta {
   const totalPages = Math.ceil(totalItems / params.pageSize);
 
-  return {
+  const meta: PaginationMeta = {
     page: params.page,
     pageSize: params.pageSize,
     totalItems,
     totalPages,
     hasNextPage: params.page < totalPages,
     hasPreviousPage: params.page > 1,
-    nextCursor: lastItemId,
   };
+  
+  if (lastItemId !== undefined) {
+    meta.nextCursor = lastItemId;
+  }
+  
+  return meta;
 }
 
 /**
@@ -207,10 +221,15 @@ export const CursorPagination = {
     const hasNextPage = data.length === pageSize;
     const lastItem = data[data.length - 1];
 
-    return {
-      nextCursor: hasNextPage ? lastItem?.id : undefined,
+    const meta: { nextCursor?: string; hasNextPage: boolean } = {
       hasNextPage,
     };
+    
+    if (hasNextPage && lastItem?.id) {
+      meta.nextCursor = lastItem.id;
+    }
+    
+    return meta;
   },
 };
 

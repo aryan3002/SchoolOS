@@ -69,5 +69,8 @@
     "*.{json,md,yml,yaml}": [
       "prettier --write"
     ]
+  },
+  "dependencies": {
+    "@prisma/client": "^5.22.0"
   }
 }

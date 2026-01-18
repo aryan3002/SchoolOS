@@ -5,15 +5,7 @@
  * Critical for compliance and security monitoring.
  */
 
-import { PrismaClient } from '@prisma/client';
-
-// Audit action types
-enum AuditAction {
-  CREATE = 'CREATE',
-  UPDATE = 'UPDATE',
-  DELETE = 'DELETE',
-  READ = 'READ',
-}
+import { PrismaClient, AuditAction } from '@prisma/client';
 
 // Models that require audit logging
 const AUDITED_MODELS = new Set([
@@ -96,17 +88,19 @@ export function createAuditLogClient(
           const result = await query(args);
 
           if (AUDITED_MODELS.has(model)) {
-            await logAuditEvent(prisma, getContext(), {
-              action: AuditAction.UPDATE,
-              entityType: model,
-              entityId:
-                (result as { id?: string }).id ??
-                (args.where as { id?: string }).id,
-              changes: {
-                before: sanitizeForAudit(before),
-                after: sanitizeForAudit(args.data),
-              },
-            });
+            const entityId = (result as { id?: string }).id ?? (args.where as { id?: string }).id;
+            
+            if (entityId) {
+              await logAuditEvent(prisma, getContext(), {
+                action: AuditAction.UPDATE,
+                entityType: model,
+                entityId,
+                changes: {
+                  before: sanitizeForAudit(before),
+                  after: sanitizeForAudit(args.data),
+                },
+              });
+            }
           }
 
           return result;
@@ -128,12 +122,16 @@ export function createAuditLogClient(
           const result = await query(args);
 
           if (AUDITED_MODELS.has(model)) {
-            await logAuditEvent(prisma, getContext(), {
-              action: AuditAction.DELETE,
-              entityType: model,
-              entityId: (args.where as { id?: string }).id,
-              changes: { before: sanitizeForAudit(before) },
-            });
+            const entityId = (args.where as { id?: string }).id;
+            
+            if (entityId) {
+              await logAuditEvent(prisma, getContext(), {
+                action: AuditAction.DELETE,
+                entityType: model,
+                entityId,
+                changes: { before: sanitizeForAudit(before) },
+              });
+            }
           }
 
           return result;
@@ -195,20 +193,29 @@ async function logAuditEvent(
   data: AuditEventData,
 ): Promise<void> {
   try {
-    await prisma.auditLog.create({
-      data: {
-        districtId: context.districtId,
-        userId: context.userId,
-        action: data.action,
-        entityType: data.entityType,
-        entityId: data.entityId,
-        changes: data.changes ?? undefined,
-        ipAddress: context.ipAddress,
-        userAgent: context.userAgent,
-        requestId: context.requestId,
-        metadata: data.metadata ?? {},
-      },
-    });
+    const logData: any = {
+      districtId: context.districtId,
+      userId: context.userId,
+      action: data.action,
+      entityType: data.entityType,
+      entityId: data.entityId,
+      metadata: data.metadata || {},
+    };
+    
+    if (data.changes !== undefined) {
+      logData.changes = data.changes;
+    }
+    if (context.ipAddress !== undefined) {
+      logData.ipAddress = context.ipAddress;
+    }
+    if (context.userAgent !== undefined) {
+      logData.userAgent = context.userAgent;
+    }
+    if (context.requestId !== undefined) {
+      logData.requestId = context.requestId;
+    }
+    
+    await prisma.auditLog.create({ data: logData });
   } catch (error) {
     // Don't fail the main operation if audit logging fails
     // But do log the error for investigation
@@ -238,12 +245,17 @@ export async function logLoginEvent(
   success: boolean,
   metadata?: Record<string, unknown>,
 ): Promise<void> {
-  await logAuditEvent(prisma, context, {
+  const eventData: AuditEventData = {
     action: success ? AuditAction.LOGIN : AuditAction.LOGIN_FAILED,
     entityType: 'User',
     entityId: userId,
-    metadata,
-  });
+  };
+  
+  if (metadata !== undefined) {
+    eventData.metadata = metadata;
+  }
+  
+  await logAuditEvent(prisma, context, eventData);
 }
 
 /**

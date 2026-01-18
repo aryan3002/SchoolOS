@@ -15,6 +15,12 @@ import { DocumentParserFactory, PDFParser, WebContentParser } from './parsers';
 import { SemanticChunker } from './chunking';
 import { EmbeddingService } from './embeddings';
 import { HybridSearchService } from './search';
+import { WebScraperService } from './scrapers';
+import { 
+  KnowledgeWorkflowService, 
+  KnowledgeFreshnessService, 
+  KnowledgeBulkOperationsService 
+} from './workflow';
 
 @Module({
   imports: [DatabaseModule, ConfigModule],
@@ -30,6 +36,12 @@ import { HybridSearchService } from './search';
     EmbeddingService,
     // Search
     HybridSearchService,
+    // Scrapers
+    WebScraperService,
+    // Workflow
+    KnowledgeWorkflowService,
+    KnowledgeFreshnessService,
+    KnowledgeBulkOperationsService,
     // Main service
     KnowledgeService,
   ],
