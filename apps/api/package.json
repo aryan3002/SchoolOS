@@ -28,6 +28,7 @@
     "@nestjs/throttler": "^5.1.1",
     "@schoolos/auth": "*",
     "@schoolos/database": "*",
+    "@schoolos/integrations": "*",
     "@schoolos/types": "*",
     "axios": "^1.13.2",
     "bcrypt": "^5.1.1",

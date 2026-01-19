@@ -60,7 +60,9 @@
       "@schoolos/config": ["packages/config/src"],
       "@schoolos/config/*": ["packages/config/src/*"],
       "@schoolos/ui": ["packages/ui/src"],
-      "@schoolos/ui/*": ["packages/ui/src/*"]
+      "@schoolos/ui/*": ["packages/ui/src/*"],
+      "@schoolos/integrations": ["services/integrations/src"],
+      "@schoolos/integrations/*": ["services/integrations/src/*"]
     }
   },
   "exclude": ["node_modules", "dist", "coverage", ".turbo"]

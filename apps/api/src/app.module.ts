@@ -13,6 +13,7 @@ import { UsersModule } from './users/users.module';
 import { RelationshipsModule } from './relationships/relationships.module';
 import { HealthModule } from './health/health.module';
 import { KnowledgeModule } from './knowledge/knowledge.module';
+import { IntegrationsModule } from './integrations/integrations.module';
 import { ThrottlerGuard } from '@nestjs/throttler';
 
 @Module({
@@ -50,6 +51,7 @@ import { ThrottlerGuard } from '@nestjs/throttler';
     RelationshipsModule,
     HealthModule,
     KnowledgeModule,
+    IntegrationsModule,
   ],
   providers: [
     // Global rate limiting guard
