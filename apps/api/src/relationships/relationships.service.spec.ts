@@ -36,7 +36,7 @@ describe('RelationshipsService', () => {
     id: 'rel-1',
     primaryUserId: 'parent-1',
     relatedUserId: 'student-1',
-    relationshipType: RelationshipType.PARENT_CHILD,
+    relationshipType: RelationshipType.PARENT_OF,
     status: RelationshipStatus.ACTIVE,
     isPrimary: true,
     metadata: {},
@@ -144,9 +144,9 @@ describe('RelationshipsService', () => {
         .mockResolvedValue(mockRelationship);
 
       const result = await service.create({
-        primaryUserId: 'parent-1',
+        userId: 'parent-1',
         relatedUserId: 'student-1',
-        relationshipType: RelationshipType.PARENT_CHILD,
+        relationshipType: RelationshipType.PARENT_OF,
         districtId: 'district-1',
       });
 
@@ -162,10 +162,10 @@ describe('RelationshipsService', () => {
 
       await expect(
         service.create({
-          primaryUserId: 'student-1',
-          relatedUserId: 'parent-1',
-          relationshipType: RelationshipType.PARENT_CHILD,
-          districtId: 'district-1',
+        userId: 'student-1',
+        relatedUserId: 'parent-1',
+        relationshipType: RelationshipType.PARENT_OF,
+        districtId: 'district-1',
         }),
       ).rejects.toThrow();
     });
@@ -181,10 +181,10 @@ describe('RelationshipsService', () => {
 
       await expect(
         service.create({
-          primaryUserId: 'parent-1',
-          relatedUserId: 'student-1',
-          relationshipType: RelationshipType.PARENT_CHILD,
-          districtId: 'district-1',
+        userId: 'parent-1',
+        relatedUserId: 'student-1',
+        relationshipType: RelationshipType.PARENT_OF,
+        districtId: 'district-1',
         }),
       ).rejects.toThrow(/already exists/);
     });

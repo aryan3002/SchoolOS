@@ -1,7 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Queue } from 'bullmq';
-import Redis from 'ioredis';
+import { ConnectionOptions, Queue } from 'bullmq';
 
 import {
   CalendarEvent,
@@ -33,7 +32,7 @@ export class IntegrationsService {
     const redisUrl = this.configService.get<string>('REDIS_URL');
     this.queue = redisUrl
       ? new Queue('sis-sync', {
-          connection: new Redis(redisUrl),
+          connection: this.parseRedisUrl(redisUrl),
         })
       : null;
 
@@ -61,11 +60,17 @@ export class IntegrationsService {
       where: { id: districtId },
       select: { features: true },
     });
-    const lastSync =
-      (district?.features as Record<string, any>)?.sis?.lastSync ?? null;
+    const features = district?.features as Record<string, unknown> | null;
+    const sisFeatures =
+      features && typeof features === 'object'
+        ? (features['sis'] as Record<string, unknown> | undefined)
+        : undefined;
+    const lastSync = sisFeatures && typeof sisFeatures === 'object'
+      ? (sisFeatures['lastSync'] as string | null | undefined)
+      : null;
 
     return {
-      lastSync: lastSync ?? undefined,
+      ...(lastSync ? { lastSync } : {}),
       queueEnabled: Boolean(this.queue),
     };
   }
@@ -116,5 +121,23 @@ export class IntegrationsService {
       clientEmail,
       privateKey,
     };
+  }
+
+  private parseRedisUrl(redisUrl: string): ConnectionOptions {
+    const url = new URL(redisUrl);
+    const db =
+      url.pathname && url.pathname.length > 1
+        ? Number(url.pathname.replace('/', '')) || 0
+        : 0;
+
+    const connection: ConnectionOptions = {
+      host: url.hostname,
+      port: url.port ? Number(url.port) : 6379,
+      db,
+      ...(url.password ? { password: url.password } : {}),
+      ...(url.protocol === 'rediss:' ? { tls: {} } : {}),
+    };
+
+    return connection;
   }
 }

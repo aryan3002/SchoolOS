@@ -33,6 +33,8 @@ export class SkywardClient {
   private readonly retryOptions: RetryOptions;
   private accessToken?: string;
   private tokenExpiresAt?: number;
+  private failureCount = 0;
+  private breakerOpenUntil?: number;
 
   constructor(
     private readonly credentials: SISCredentials,
@@ -211,6 +213,10 @@ export class SkywardClient {
     config: AxiosRequestConfig,
     attempt = 0,
   ): Promise<T> {
+    if (this.breakerOpenUntil && Date.now() < this.breakerOpenUntil) {
+      throw new IntegrationError('Skyward circuit breaker open', 'skyward', 503);
+    }
+
     return this.limiter.schedule(async () => {
       try {
         const response = await this.axiosInstance.request<T>({
@@ -223,6 +229,8 @@ export class SkywardClient {
         });
 
         this.logSuccess(response, config.url ?? '');
+        this.failureCount = 0;
+        this.breakerOpenUntil = undefined;
         return response.data;
       } catch (err) {
         const error = err as AxiosError;
@@ -230,6 +238,15 @@ export class SkywardClient {
           const wait = this.computeBackoff(attempt);
           await sleep(wait);
           return this.request(config, attempt + 1);
+        }
+
+        this.failureCount += 1;
+        if (this.failureCount >= 3) {
+          this.breakerOpenUntil = Date.now() + 30_000;
+          this.logger.warn('Skyward circuit breaker opened', {
+            vendor: 'skyward',
+            reopenAt: new Date(this.breakerOpenUntil),
+          });
         }
 
         this.logger.error('Skyward request failed', {

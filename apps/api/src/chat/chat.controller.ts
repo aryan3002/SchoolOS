@@ -38,6 +38,7 @@ import {
   ConversationDto,
   DeleteConversationResponseDto,
 } from './dto';
+import { SendMessageInput } from './conversation.service';
 import { UserContext } from '@schoolos/ai';
 
 // ============================================================
@@ -51,6 +52,10 @@ interface AuthenticatedRequest {
     role: string;
     schoolId?: string;
     childIds?: string[];
+    schoolIds?: string[];
+    email?: string;
+    displayName?: string;
+    permissions?: string[];
   };
 }
 
@@ -97,17 +102,25 @@ export class ChatController {
       userId: req.user.id,
       districtId: req.user.districtId,
       role: req.user.role as UserContext['role'],
-      schoolId: req.user.schoolId,
+      schoolIds: req.user.schoolIds ?? (req.user.schoolId ? [req.user.schoolId] : undefined),
+      email: req.user.email,
+      displayName: req.user.displayName ?? req.user.id,
       childIds: req.user.childIds,
+      permissions: req.user.permissions,
     };
 
     try {
-      const result = await this.conversationService.sendMessage({
-        conversationId: dto.conversationId,
+      const payload: SendMessageInput = {
         message: dto.message,
         userContext,
-        metadata: dto.metadata,
-      });
+        ...(dto.metadata ? { metadata: dto.metadata } : {}),
+      };
+
+      if (dto.conversationId) {
+        payload.conversationId = dto.conversationId;
+      }
+
+      const result = await this.conversationService.sendMessage(payload);
 
       return result;
     } catch (error) {
@@ -139,13 +152,18 @@ export class ChatController {
     @Query() dto: ListConversationsDto,
     @Request() req: AuthenticatedRequest,
   ): Promise<ListConversationsResponseDto> {
+    const options =
+      dto.limit !== undefined || dto.offset !== undefined
+        ? {
+            ...(dto.limit !== undefined ? { limit: dto.limit } : {}),
+            ...(dto.offset !== undefined ? { offset: dto.offset } : {}),
+          }
+        : undefined;
+
     return this.conversationService.listConversations(
       req.user.id,
       req.user.districtId,
-      {
-        limit: dto.limit,
-        offset: dto.offset,
-      },
+      options,
     );
   }
 
@@ -185,7 +203,18 @@ export class ChatController {
       throw new NotFoundException('Conversation not found');
     }
 
-    return conversation;
+    return {
+      id: conversation.id,
+      messages: conversation.messages.map((m) => ({
+        id: m.id ?? '',
+        role: m.role,
+        content: m.content,
+        timestamp: m.timestamp,
+        ...(m.metadata ? { metadata: m.metadata } : {}),
+      })),
+      createdAt: conversation.createdAt,
+      updatedAt: conversation.updatedAt,
+    };
   }
 
   /**

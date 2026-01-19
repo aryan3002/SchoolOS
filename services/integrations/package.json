@@ -14,8 +14,8 @@
     }
   },
   "scripts": {
-    "build": "tsup src/index.ts --format cjs,esm --dts --clean",
-    "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
+    "build": "tsup src/index.ts --format cjs,esm --clean --tsconfig tsconfig.json",
+    "dev": "tsup src/index.ts --format cjs,esm --watch --tsconfig tsconfig.json",
     "lint": "eslint \"src/**/*.ts\" --fix",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
@@ -33,7 +33,6 @@
   },
   "devDependencies": {
     "@types/node": "^20.10.0",
-    "@types/nock": "^13.0.5",
     "@types/uuid": "^9.0.7",
     "nock": "^13.5.5",
     "tsup": "^8.0.1",

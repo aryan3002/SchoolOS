@@ -15,6 +15,7 @@ import { HealthModule } from './health/health.module';
 import { KnowledgeModule } from './knowledge/knowledge.module';
 import { IntegrationsModule } from './integrations/integrations.module';
 import { ThrottlerGuard } from '@nestjs/throttler';
+import { envValidationSchema } from './config/env.validation';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { ThrottlerGuard } from '@nestjs/throttler';
       isGlobal: true,
       envFilePath: ['../../.env.local', '../../.env', '.env.local', '.env'],
       cache: true,
+      validationSchema: envValidationSchema,
     }),
 
     // Rate limiting

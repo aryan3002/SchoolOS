@@ -223,7 +223,7 @@ describe('AuthorizationService', () => {
       const result = await service.hasRelationshipAccess(
         parentContext,
         'student-1',
-        [RelationshipType.PARENT_CHILD],
+        [RelationshipType.PARENT_OF],
       );
 
       expect(result).toBe(true);

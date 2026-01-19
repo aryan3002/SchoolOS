@@ -3,7 +3,7 @@
  */
 
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe, VersioningType } from '@nestjs/common';
+import { LogLevel, ValidationPipe, VersioningType } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import helmet from 'helmet';
 
@@ -13,8 +13,13 @@ import { TransformInterceptor } from './common/interceptors/transform.intercepto
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 
 async function bootstrap(): Promise<void> {
+  const bootstrapConfigService = new ConfigService();
+  const env = bootstrapConfigService.get<string>('NODE_ENV') ?? 'development';
+  const loggerLevels: LogLevel[] =
+    env === 'production' ? ['error', 'warn', 'log'] : ['error', 'warn', 'log', 'debug', 'verbose'];
+
   const app = await NestFactory.create(AppModule, {
-    logger: ['error', 'warn', 'log', 'debug', 'verbose'],
+    logger: loggerLevels,
   });
 
   const configService = app.get(ConfigService);
@@ -23,9 +28,11 @@ async function bootstrap(): Promise<void> {
   app.use(helmet());
 
   // CORS configuration
-  const corsOrigins = configService.get<string>('CORS_ORIGINS')?.split(',') ?? [];
+  const corsOriginEnv =
+    configService.get<string>('CORS_ORIGINS') ?? 'http://localhost:3000';
+  const corsOrigins = corsOriginEnv.split(',').map((origin) => origin.trim()).filter(Boolean);
   app.enableCors({
-    origin: corsOrigins.length > 0 ? corsOrigins : true,
+    origin: corsOrigins,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-District-ID', 'X-Request-ID'],

@@ -4,10 +4,10 @@
 
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
-import * as request from 'supertest';
+import request from 'supertest';
 
-import { AppModule } from '../app.module';
-import { PrismaService } from '../database/prisma.service';
+import { AppModule } from '../src/app.module';
+import { PrismaService } from '../src/database/prisma.service';
 
 describe('AuthController (e2e)', () => {
   let app: INestApplication;
@@ -42,6 +42,7 @@ describe('AuthController (e2e)', () => {
         .send({
           email: 'invalid-email',
           password: 'password123',
+          districtId: '00000000-0000-0000-0000-000000000000',
         })
         .expect(400);
     });
@@ -51,6 +52,7 @@ describe('AuthController (e2e)', () => {
         .post('/api/v1/auth/login')
         .send({
           email: 'test@example.com',
+          districtId: '00000000-0000-0000-0000-000000000000',
         })
         .expect(400);
     });
@@ -61,6 +63,7 @@ describe('AuthController (e2e)', () => {
         .send({
           email: 'nonexistent@example.com',
           password: 'Password123!',
+          districtId: '00000000-0000-0000-0000-000000000000',
         })
         .expect(401);
     });

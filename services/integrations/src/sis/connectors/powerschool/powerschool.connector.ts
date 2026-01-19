@@ -30,11 +30,11 @@ import { PowerSchoolMapper } from './powerschool.mapper';
  * Handles OAuth, rate limiting, pagination, and mapping to raw SIS types.
  */
 export class PowerSchoolConnector implements SISConnector {
-  private readonly client: PowerSchoolClient;
+  private client: PowerSchoolClient;
   private readonly mapper: PowerSchoolMapper;
 
   constructor(
-    private readonly credentials: SISCredentials,
+    private credentials: SISCredentials,
     private readonly prisma: PrismaClient,
     private readonly logger: Logger,
   ) {
@@ -46,7 +46,11 @@ export class PowerSchoolConnector implements SISConnector {
   }
 
   async authenticate(credentials: SISCredentials): Promise<SISConnection> {
-    this.credentials.baseUrl = credentials.baseUrl;
+    this.credentials = credentials;
+    this.client = new PowerSchoolClient(
+      credentials,
+      this.logger.child ? this.logger.child({ vendor: 'powerschool' }) : this.logger,
+    );
     return this.client.authenticate();
   }
 

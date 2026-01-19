@@ -91,7 +91,7 @@ describe('AuthService', () => {
 
   describe('login', () => {
     it('should successfully login with valid credentials', async () => {
-      prismaService.user.findUnique = jest.fn().mockResolvedValue(mockUser);
+      prismaService.user.findFirst = jest.fn().mockResolvedValue(mockUser);
       tokenService.generateTokenPair = jest.fn().mockResolvedValue({
         accessToken: 'access-token',
         refreshToken: 'refresh-token',
@@ -106,32 +106,44 @@ describe('AuthService', () => {
     });
 
     it('should throw UnauthorizedException for invalid email', async () => {
-      prismaService.user.findUnique = jest.fn().mockResolvedValue(null);
+      prismaService.user.findFirst = jest.fn().mockResolvedValue(null);
 
       await expect(
-        service.login({ email: 'invalid@example.com', password: 'password' }),
+        service.login({
+          email: 'invalid@example.com',
+          password: 'password',
+          districtId: 'district-1',
+        }),
       ).rejects.toThrow('Invalid email or password');
     });
 
     it('should throw UnauthorizedException for locked account', async () => {
-      prismaService.user.findUnique = jest.fn().mockResolvedValue({
+      prismaService.user.findFirst = jest.fn().mockResolvedValue({
         ...mockUser,
         lockedUntil: new Date(Date.now() + 60000),
       });
 
       await expect(
-        service.login({ email: 'test@example.com', password: 'password' }),
+        service.login({
+          email: 'test@example.com',
+          password: 'password',
+          districtId: 'district-1',
+        }),
       ).rejects.toThrow(/Account is locked/);
     });
 
     it('should throw UnauthorizedException for suspended account', async () => {
-      prismaService.user.findUnique = jest.fn().mockResolvedValue({
+      prismaService.user.findFirst = jest.fn().mockResolvedValue({
         ...mockUser,
         status: UserStatus.SUSPENDED,
       });
 
       await expect(
-        service.login({ email: 'test@example.com', password: 'password' }),
+        service.login({
+          email: 'test@example.com',
+          password: 'password',
+          districtId: 'district-1',
+        }),
       ).rejects.toThrow(/suspended/);
     });
   });

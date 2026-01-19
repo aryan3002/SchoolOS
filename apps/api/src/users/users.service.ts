@@ -314,7 +314,7 @@ export class UsersService {
       where: { id },
       data: {
         deletedAt: new Date(),
-        status: UserStatus.ARCHIVED,
+        status: UserStatus.INACTIVE,
       },
     });
 

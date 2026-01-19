@@ -13,7 +13,6 @@ export { BaseTool, ToolRegistry } from './base-tool';
 export {
   KnowledgeRetrievalTool,
   type KnowledgeRetrievalParams,
-  type KnowledgeSource,
 } from './knowledge-retrieval.tool';
 
 export {

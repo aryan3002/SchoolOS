@@ -31,6 +31,13 @@ export interface ResourceContext {
 @Injectable()
 export class AuthorizationService {
   private readonly logger = new Logger(AuthorizationService.name);
+  private readonly rolePermissions: Record<UserRole, Permission[]> = {
+    [UserRole.ADMIN]: ['*'],
+    [UserRole.TEACHER]: ['users:read', 'chat:own', 'relationships:read'],
+    [UserRole.STUDENT]: ['chat:own'],
+    [UserRole.PARENT]: ['chat:own', 'relationships:read'],
+    [UserRole.STAFF]: ['users:read', 'chat:own'],
+  };
 
   // Cache for relationship checks (user -> target -> relationship status)
   private relationshipCache = new Map<string, { result: boolean; expiry: number }>();
@@ -41,33 +48,33 @@ export class AuthorizationService {
   /**
    * Check if user has a specific permission
    */
-  hasPermission(_role: UserRole, _permission: Permission): boolean {
-    // TODO: Implement once @schoolos/auth is fixed
-    return true;
+  hasPermission(role: UserRole, permission: Permission): boolean {
+    const permissions = this.rolePermissions[role] || [];
+    if (permissions.includes('*')) {
+      return true;
+    }
+    return permissions.includes(permission);
   }
 
   /**
    * Check if user has any of the specified permissions
    */
-  hasAnyPermission(_role: UserRole, _permissions: Permission[]): boolean {
-    // TODO: Implement once @schoolos/auth is fixed
-    return true;
+  hasAnyPermission(role: UserRole, permissions: Permission[]): boolean {
+    return permissions.some((p) => this.hasPermission(role, p));
   }
 
   /**
    * Check if user has all of the specified permissions
    */
-  hasAllPermissions(_role: UserRole, _permissions: Permission[]): boolean {
-    // TODO: Implement once @schoolos/auth is fixed
-    return true;
+  hasAllPermissions(role: UserRole, permissions: Permission[]): boolean {
+    return permissions.every((p) => this.hasPermission(role, p));
   }
 
   /**
    * Get all permissions for a role
    */
-  getPermissionsForRole(_role: UserRole): Permission[] {
-    // TODO: Implement once @schoolos/auth is fixed
-    return [];
+  getPermissionsForRole(role: UserRole): Permission[] {
+    return this.rolePermissions[role] || [];
   }
 
   /**

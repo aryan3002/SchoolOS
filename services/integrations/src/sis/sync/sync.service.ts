@@ -165,75 +165,110 @@ export class SISSyncService {
     errors: SyncError[],
   ): Promise<void> {
     const credentials = this.extractCredentials(district);
-    const studentIdMap = new Map<string, string>();
-    const guardianIdMap = new Map<string, string>();
+    const studentRecords = new Map<
+      string,
+      { student: RawStudent; enrollment?: RawEnrollment; guardians: RawGuardian[] }
+    >();
 
     const syncOptions: SyncOptions = {
       schoolIds: this.extractSchoolIds(district),
       pageSize: 200,
       onStudent: async (rawStudent: RawStudent) => {
-        const normalized = await this.normalizer.normalizeStudent(
-          credentials.vendor,
-          rawStudent,
-          district.id,
-        );
-        const userId = await this.persistStudent(normalized, district);
-        studentIdMap.set(rawStudent.id, userId);
-        stats.studentsProcessed += 1;
+        studentRecords.set(rawStudent.id, { student: rawStudent, guardians: [] });
       },
       onEnrollment: async (rawEnrollment: RawEnrollment) => {
-        const normalized = await this.normalizer.normalizeEnrollment(
-          credentials.vendor,
-          rawEnrollment,
-          district.id,
-        );
-        await this.persistEnrollment(normalized, district);
-        stats.enrollmentsProcessed += 1;
+        const existing = studentRecords.get(rawEnrollment.studentId);
+        if (existing) {
+          existing.enrollment = rawEnrollment;
+        } else {
+          studentRecords.set(rawEnrollment.studentId, {
+            student: {
+              id: rawEnrollment.studentId,
+              studentNumber: '',
+              firstName: '',
+              lastName: '',
+              dateOfBirth: new Date(0),
+              grade: rawEnrollment.grade,
+            },
+            enrollment: rawEnrollment,
+            guardians: [],
+          });
+        }
       },
       onGuardian: async (studentExternalId: string, rawGuardian: RawGuardian) => {
-        const normalized = await this.normalizer.normalizeGuardian(
-          credentials.vendor,
-          rawGuardian,
-          district.id,
-        );
-        const guardianId = await this.persistGuardian(normalized, district);
-        guardianIdMap.set(rawGuardian.id, guardianId);
-        stats.guardiansProcessed += 1;
-      },
-      onRelationship: async (studentExternalId: string, rawGuardian: RawGuardian) => {
-        const guardianUserId = guardianIdMap.get(rawGuardian.id);
-        const studentUserId = studentIdMap.get(studentExternalId);
-        if (!guardianUserId || !studentUserId) {
-          return;
+        const record = studentRecords.get(studentExternalId);
+        if (record) {
+          record.guardians.push(rawGuardian);
+        } else {
+          studentRecords.set(studentExternalId, {
+            student: {
+              id: studentExternalId,
+              studentNumber: '',
+              firstName: '',
+              lastName: '',
+              dateOfBirth: new Date(0),
+              grade: 0,
+            },
+            enrollment: undefined,
+            guardians: [rawGuardian],
+          });
         }
-        await this.persistRelationship(
-          guardianUserId,
-          studentUserId,
-          rawGuardian.relationship,
-          rawGuardian.isPrimary,
-          district,
-        );
-        stats.relationshipsCreated += 1;
       },
     };
 
     const result = await connector.syncDistrict(district.id, syncOptions);
-    // Merge connector-reported stats
-    stats.errors += result.stats.errors;
-    stats.studentsProcessed = Math.max(stats.studentsProcessed, result.stats.studentsProcessed);
-    stats.enrollmentsProcessed = Math.max(
-      stats.enrollmentsProcessed,
-      result.stats.enrollmentsProcessed,
-    );
-    stats.guardiansProcessed = Math.max(
-      stats.guardiansProcessed,
-      result.stats.guardiansProcessed,
-    );
-    stats.relationshipsCreated = Math.max(
-      stats.relationshipsCreated,
-      result.stats.relationshipsCreated,
-    );
     errors.push(...result.errors);
+
+    for (const record of studentRecords.values()) {
+      try {
+        await this.prisma.$transaction(async (tx) => {
+          const normalizedStudent = await this.normalizer.normalizeStudent(
+            credentials.vendor,
+            record.student,
+            district.id,
+          );
+          const studentUserId = await this.persistStudent(normalizedStudent, district, tx);
+          stats.studentsProcessed += 1;
+
+          if (record.enrollment) {
+            const normalizedEnrollment = await this.normalizer.normalizeEnrollment(
+              credentials.vendor,
+              record.enrollment,
+              district.id,
+            );
+            await this.persistEnrollment(normalizedEnrollment, district, tx);
+            stats.enrollmentsProcessed += 1;
+          }
+
+          for (const guardian of record.guardians) {
+            const normalizedGuardian = await this.normalizer.normalizeGuardian(
+              credentials.vendor,
+              guardian,
+              district.id,
+            );
+            const guardianUserId = await this.persistGuardian(normalizedGuardian, district, tx);
+            stats.guardiansProcessed += 1;
+            await this.persistRelationship(
+              guardianUserId,
+              studentUserId,
+              guardian.relationship,
+              guardian.isPrimary,
+              district,
+              tx,
+            );
+            stats.relationshipsCreated += 1;
+          }
+        });
+      } catch (error) {
+        errors.push({
+          entity: 'student',
+          id: record.student.id,
+          error: error instanceof Error ? error.message : 'Unknown error',
+          timestamp: new Date(),
+        });
+        stats.errors += 1;
+      }
+    }
   }
 
   private async processChange(
@@ -274,11 +309,12 @@ export class SISSyncService {
   private async persistStudent(
     student: Awaited<ReturnType<DistrictGraphNormalizer['normalizeStudent']>>,
     district: District,
+    client: PrismaClient = this.prisma,
   ): Promise<string> {
     const email =
       student.profile.email ??
       this.buildFallbackEmail(student.externalId, district.slug);
-    const existing = await this.prisma.user.findFirst({
+    const existing = await client.user.findFirst({
       where: {
         districtId: district.id,
         sisId: student.externalId,
@@ -291,7 +327,7 @@ export class SISSyncService {
         ? student.profile.schoolId
         : existing.schoolId;
 
-      const updated = await this.prisma.user.update({
+      const updated = await client.user.update({
         where: { id: existing.id },
         data: {
           firstName: student.profile.firstName,
@@ -313,7 +349,7 @@ export class SISSyncService {
       return updated.id;
     }
 
-    const created = await this.prisma.user.create({
+    const created = await client.user.create({
       data: {
         districtId: district.id,
         firstName: student.profile.firstName,
@@ -344,12 +380,13 @@ export class SISSyncService {
   private async persistGuardian(
     guardian: Awaited<ReturnType<DistrictGraphNormalizer['normalizeGuardian']>>,
     district: District,
+    client: PrismaClient = this.prisma,
   ): Promise<string> {
     const email =
       guardian.profile.email ??
       this.buildFallbackEmail(guardian.externalId, district.slug, 'guardian');
 
-    const existing = await this.prisma.user.findFirst({
+    const existing = await client.user.findFirst({
       where: {
         districtId: district.id,
         sisId: guardian.externalId,
@@ -358,7 +395,7 @@ export class SISSyncService {
     });
 
     if (existing) {
-      const updated = await this.prisma.user.update({
+      const updated = await client.user.update({
         where: { id: existing.id },
         data: {
           firstName: guardian.profile.firstName,
@@ -379,7 +416,7 @@ export class SISSyncService {
       return updated.id;
     }
 
-    const created = await this.prisma.user.create({
+    const created = await client.user.create({
       data: {
         districtId: district.id,
         firstName: guardian.profile.firstName,
@@ -406,8 +443,9 @@ export class SISSyncService {
   private async persistEnrollment(
     enrollment: Awaited<ReturnType<DistrictGraphNormalizer['normalizeEnrollment']>>,
     district: District,
+    client: PrismaClient = this.prisma,
   ): Promise<void> {
-    const student = await this.prisma.user.findFirst({
+    const student = await client.user.findFirst({
       where: {
         districtId: district.id,
         sisId: enrollment.externalStudentId,
@@ -417,7 +455,7 @@ export class SISSyncService {
 
     if (!student) return;
 
-    await this.prisma.user.update({
+    await client.user.update({
       where: { id: student.id },
       data: {
         metadata: this.mergeMetadata(student.metadata, {
@@ -440,9 +478,10 @@ export class SISSyncService {
     relationshipType: string,
     isPrimary: boolean,
     district: District,
+    client: PrismaClient = this.prisma,
   ): Promise<void> {
     const mappedRelationship = this.mapRelationshipType(relationshipType);
-    const existing = await this.prisma.userRelationship.findFirst({
+    const existing = await client.userRelationship.findFirst({
       where: {
         districtId: district.id,
         userId: guardianUserId,
@@ -452,7 +491,7 @@ export class SISSyncService {
     });
 
     if (existing) {
-      await this.prisma.userRelationship.update({
+      await client.userRelationship.update({
         where: { id: existing.id },
         data: {
           isPrimary,
@@ -466,7 +505,7 @@ export class SISSyncService {
       return;
     }
 
-    await this.prisma.userRelationship.create({
+    await client.userRelationship.create({
       data: {
         districtId: district.id,
         userId: guardianUserId,

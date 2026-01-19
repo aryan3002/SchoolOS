@@ -35,6 +35,8 @@ export class PowerSchoolClient {
   private readonly retryOptions: RetryOptions;
   private accessToken?: string;
   private tokenExpiresAt?: number;
+  private failureCount = 0;
+  private breakerOpenUntil?: number;
 
   constructor(
     private readonly credentials: SISCredentials,
@@ -243,6 +245,14 @@ export class PowerSchoolClient {
     config: AxiosRequestConfig,
     attempt = 0,
   ): Promise<T> {
+    if (this.breakerOpenUntil && Date.now() < this.breakerOpenUntil) {
+      throw new IntegrationError(
+        'PowerSchool circuit breaker open',
+        'powerschool',
+        503,
+      );
+    }
+
     return this.limiter.schedule(async () => {
       const start = Date.now();
       try {
@@ -260,6 +270,8 @@ export class PowerSchoolClient {
         });
 
         this.logSuccess(response, start, config.url ?? '');
+        this.failureCount = 0;
+        this.breakerOpenUntil = undefined;
         return response.data;
       } catch (error) {
         const axiosError = error as AxiosError;
@@ -278,6 +290,15 @@ export class PowerSchoolClient {
           );
           await delay(delayMs);
           return this.request<T>(config, attempt + 1);
+        }
+
+        this.failureCount += 1;
+        if (this.failureCount >= 3) {
+          this.breakerOpenUntil = Date.now() + 30_000;
+          this.logger.warn('PowerSchool circuit breaker opened', {
+            vendor: 'powerschool',
+            reopenAt: new Date(this.breakerOpenUntil),
+          });
         }
 
         this.logger.error('PowerSchool request failed', {

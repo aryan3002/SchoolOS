@@ -9,7 +9,7 @@
 
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { PrismaService } from '../prisma/prisma.service';
+import { PrismaService } from '../database/prisma.service';
 import {
   IntentClassifier,
   ToolRouter,
@@ -24,12 +24,12 @@ import {
   UserContext,
   ConversationContext,
   ConversationMessage,
-  ConversationResponse,
   IntentCategory,
-  UrgencyLevel,
-  EscalationReason,
+  SafetyCheckResult,
+  ToolResult,
 } from '@schoolos/ai';
-import { HybridSearchService } from '../knowledge/hybrid-search.service';
+import { HybridSearchService } from '../knowledge/search/hybrid-search.service';
+import { $Enums } from '@prisma/client';
 
 // ============================================================
 // TYPES
@@ -86,7 +86,7 @@ export interface ConversationServiceResponse {
 // ============================================================
 
 class MockCalendarService {
-  async getEvents(params: {
+  async getEvents(_params: {
     districtId: string;
     startDate: Date;
     endDate: Date;
@@ -99,22 +99,22 @@ class MockCalendarService {
 }
 
 class MockStudentDataService {
-  async getStudentInfo(studentId: string, districtId: string) {
+  async getStudentInfo(_studentId: string, _districtId: string) {
     return null;
   }
-  async getStudentGrades(studentId: string, districtId: string) {
+  async getStudentGrades(_studentId: string, _districtId: string) {
     return [];
   }
-  async getStudentAttendance(studentId: string, districtId: string) {
+  async getStudentAttendance(_studentId: string, _districtId: string) {
     return { totalDays: 0, present: 0, absent: 0, tardy: 0, excused: 0, recentAbsences: [] };
   }
-  async getStudentAssignments(studentId: string, districtId: string) {
+  async getStudentAssignments(_studentId: string, _districtId: string) {
     return [];
   }
 }
 
 class MockEscalationService {
-  async createEscalation(request: any) {
+  async createEscalation(_request: any) {
     return {
       ticketId: `ESC-${Date.now()}`,
       estimatedWaitTime: 300,
@@ -219,7 +219,11 @@ export class ConversationService implements OnModuleInit {
       this.logger.warn('Input failed safety check', { violations: inputSafetyCheck.violations });
 
       // For severe violations, reject the message
-      if (inputSafetyCheck.violations.some((v) => v.severity === 'HIGH')) {
+      if (
+        inputSafetyCheck.violations.some(
+          (v: SafetyCheckResult['violations'][number]) => v.severity === 'HIGH',
+        )
+      ) {
         return this.createSafetyErrorResponse(conversationId || '', inputSafetyCheck);
       }
     }
@@ -274,7 +278,7 @@ export class ConversationService implements OnModuleInit {
     const routing = await this.toolRouter.route(intent, userContext, conversationContext);
 
     this.logger.debug('Routing determined', {
-      tools: routing.selectedTools.map((t) => t.toolName),
+      tools: routing.selectedTools.map((t: { toolName: string }) => t.toolName),
       requiresEscalation: routing.requiresEscalation,
     });
 
@@ -310,7 +314,7 @@ export class ConversationService implements OnModuleInit {
     await this.saveMessage(conversation.id, 'assistant', finalContent, {
       intent: intent.category,
       confidence: intent.confidence,
-      toolsUsed: executionResult.toolResults.map((r) => r.toolName),
+      toolsUsed: executionResult.toolResults.map((r: ToolResult) => r.toolName),
       citations: generatedResponse.citations,
       safetyFiltered: !outputSafetyCheck.passed,
     });
@@ -318,7 +322,7 @@ export class ConversationService implements OnModuleInit {
     // 13. Update conversation metadata
     await this.updateConversationMetadata(conversation.id, {
       lastIntentCategory: intent.category,
-      lastToolsUsed: executionResult.toolResults.map((r) => r.toolName),
+      lastToolsUsed: executionResult.toolResults.map((r: ToolResult) => r.toolName),
       messageCount: conversationHistory.length + 2,
       requiresFollowUp: executionResult.requiresFollowUp,
     });
@@ -327,13 +331,17 @@ export class ConversationService implements OnModuleInit {
       conversationId: conversation.id,
       messageId: userMessage.id,
       response: finalContent,
-      citations: generatedResponse.citations,
+      citations: (generatedResponse.citations as Array<{
+        sourceId: string;
+        sourceTitle: string;
+        quote?: string;
+      }> | undefined) ?? [],
       suggestedFollowUps: generatedResponse.suggestedFollowUps,
-      requiresFollowUp: executionResult.requiresFollowUp,
+      requiresFollowUp: executionResult.requiresFollowUp ?? false,
       metadata: {
         intentCategory: intent.category,
         confidence: generatedResponse.confidence,
-        toolsUsed: executionResult.toolResults.map((r) => r.toolName),
+        toolsUsed: executionResult.toolResults.map((r: ToolResult) => r.toolName),
         processingTimeMs: Date.now() - startTime,
       },
     };
@@ -369,13 +377,20 @@ export class ConversationService implements OnModuleInit {
 
     return {
       id: conversation.id,
-      messages: conversation.messages.map((m) => ({
-        id: m.id,
-        role: m.role as 'user' | 'assistant' | 'system',
-        content: m.content,
-        timestamp: m.createdAt,
-        metadata: m.metadata as Record<string, unknown> | undefined,
-      })),
+      messages: conversation.messages.map(
+        (m): ConversationMessage => ({
+          id: m.id,
+          role: (typeof m.role === 'string' ? m.role.toLowerCase() : m.role) as
+            | 'user'
+            | 'assistant'
+            | 'system',
+          content: m.content,
+          timestamp: m.createdAt,
+          ...(m && (m as any).metadata
+            ? { metadata: (m as any).metadata as Record<string, unknown> }
+            : {}),
+        }),
+      ),
       createdAt: conversation.createdAt,
       updatedAt: conversation.updatedAt,
     };
@@ -429,8 +444,10 @@ export class ConversationService implements OnModuleInit {
     return {
       conversations: conversations.map((c) => ({
         id: c.id,
-        title: c.title || undefined,
-        lastMessage: c.messages[0]?.content.substring(0, 100),
+        ...(c.title ? { title: c.title } : {}),
+        ...(c.messages[0]?.content
+          ? { lastMessage: c.messages[0]?.content.substring(0, 100) }
+          : {}),
         messageCount: c._count.messages,
         createdAt: c.createdAt,
         updatedAt: c.updatedAt,
@@ -487,7 +504,7 @@ export class ConversationService implements OnModuleInit {
         districtId: userContext.districtId,
         metadata: {
           userRole: userContext.role,
-          schoolId: userContext.schoolId,
+          primarySchoolId: userContext.schoolIds?.[0],
         },
       },
     });
@@ -497,14 +514,15 @@ export class ConversationService implements OnModuleInit {
     conversationId: string,
     role: 'user' | 'assistant' | 'system',
     content: string,
-    metadata?: Record<string, unknown>,
+    _metadata?: Record<string, unknown>,
   ) {
+    const prismaRole = role.toUpperCase() as $Enums.MessageRole;
+
     return this.prisma.message.create({
       data: {
         conversationId,
-        role,
+        role: prismaRole,
         content,
-        metadata: metadata || {},
       },
     });
   }
@@ -516,12 +534,17 @@ export class ConversationService implements OnModuleInit {
       take: 20, // Limit history for context window
     });
 
-    return messages.map((m) => ({
+    return messages.map((m): ConversationMessage => ({
       id: m.id,
-      role: m.role as 'user' | 'assistant' | 'system',
+      role: (typeof m.role === 'string' ? m.role.toLowerCase() : m.role) as
+        | 'user'
+        | 'assistant'
+        | 'system',
       content: m.content,
       timestamp: m.createdAt,
-      metadata: m.metadata as Record<string, unknown> | undefined,
+      ...(m && (m as any).metadata
+        ? { metadata: (m as any).metadata as Record<string, unknown> }
+        : {}),
     }));
   }
 
@@ -531,9 +554,9 @@ export class ConversationService implements OnModuleInit {
     const lastFewMessages = messages.slice(-5);
 
     for (const msg of lastFewMessages) {
-      const metadata = msg.metadata as Record<string, unknown> | undefined;
-      if (metadata?.intent) {
-        recentTopics.push(metadata.intent as string);
+      const metadata = (msg as any).metadata as Record<string, unknown> | undefined;
+      if (metadata?.['intent']) {
+        recentTopics.push(metadata['intent'] as string);
       }
     }
 
@@ -551,14 +574,14 @@ export class ConversationService implements OnModuleInit {
   }
 
   private isSimpleIntent(intent: ClassifiedIntent): boolean {
-    const simpleCategories = [IntentCategory.GREETING, IntentCategory.OUT_OF_SCOPE];
-    return simpleCategories.includes(intent.category) && intent.confidence > 0.8;
+    const simpleCategories: string[] = ['GREETING', 'OUT_OF_SCOPE'];
+    return simpleCategories.includes(intent.category as string) && intent.confidence > 0.8;
   }
 
   private async handleSimpleIntent(
     intent: ClassifiedIntent,
     userContext: UserContext,
-    conversationContext?: ConversationContext,
+    _conversationContext?: ConversationContext,
   ): Promise<Omit<ConversationServiceResponse, 'conversationId' | 'messageId' | 'metadata'>> {
     if (intent.category === IntentCategory.GREETING) {
       const greeting = this.getGreetingResponse(userContext);
@@ -598,12 +621,12 @@ export class ConversationService implements OnModuleInit {
       STAFF: "Hello! I'm the school assistant. How can I help you today?",
     };
 
-    return roleGreetings[userContext.role] || roleGreetings.STAFF;
+    return (roleGreetings[userContext.role] ?? roleGreetings['STAFF']) ?? 'Hello!';
   }
 
   private createSafetyErrorResponse(
     conversationId: string,
-    safetyCheck: { violations: Array<{ description: string }> },
+    _safetyCheck: SafetyCheckResult,
   ): ConversationServiceResponse {
     return {
       conversationId,

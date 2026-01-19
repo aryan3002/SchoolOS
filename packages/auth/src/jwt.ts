@@ -8,6 +8,7 @@
 import * as jwt from 'jsonwebtoken';
 
 import type { JwtPayload, AuthUser, UserRole, UserStatus } from '@schoolos/types';
+import type { StringValue as MsStringValue } from 'ms';
 
 /**
  * JWT configuration
@@ -84,12 +85,14 @@ export class JwtService {
       type: 'access',
     };
 
-    return jwt.sign(payload, this.config.privateKey, {
+    const options: jwt.SignOptions = {
       algorithm: 'RS256',
-      expiresIn: this.config.accessTokenExpiry,
-      issuer: this.config.issuer,
-      audience: this.config.audience,
-    });
+      expiresIn: this.config.accessTokenExpiry as MsStringValue,
+      issuer: this.config.issuer ?? undefined,
+      audience: this.config.audience ?? undefined,
+    };
+
+    return jwt.sign(payload, this.config.privateKey, options);
   }
 
   /**
@@ -106,12 +109,14 @@ export class JwtService {
       type: 'refresh',
     };
 
-    return jwt.sign(payload, this.config.privateKey, {
+    const options: jwt.SignOptions = {
       algorithm: 'RS256',
-      expiresIn: this.config.refreshTokenExpiry,
-      issuer: this.config.issuer,
-      audience: this.config.audience,
-    });
+      expiresIn: this.config.refreshTokenExpiry as MsStringValue,
+      issuer: this.config.issuer ?? undefined,
+      audience: this.config.audience ?? undefined,
+    };
+
+    return jwt.sign(payload, this.config.privateKey, options);
   }
 
   /**
@@ -215,11 +220,17 @@ export class JwtService {
         };
       }
 
-      return {
+      const result: TokenVerificationResult & {
+        userId?: string;
+        districtId?: string;
+      } = {
         valid: true,
-        userId: payload.sub,
         districtId: payload.districtId,
       };
+      if (payload.sub) {
+        result.userId = payload.sub;
+      }
+      return result;
     } catch (error) {
       if (error instanceof jwt.TokenExpiredError) {
         return {
@@ -293,8 +304,8 @@ export function createJwtServiceFromEnv(env: {
     publicKey,
     accessTokenExpiry: env.JWT_ACCESS_TOKEN_EXPIRY ?? '15m',
     refreshTokenExpiry: env.JWT_REFRESH_TOKEN_EXPIRY ?? '7d',
-    issuer: env.JWT_ISSUER,
-    audience: env.JWT_AUDIENCE,
+    issuer: env.JWT_ISSUER ?? 'schoolos',
+    audience: env.JWT_AUDIENCE ?? 'schoolos-api',
   });
 }
 

@@ -91,7 +91,7 @@ describe('UsersService', () => {
     it('should return user when found', async () => {
       prismaService.user.findUnique = jest.fn().mockResolvedValue(mockUser);
 
-      const result = await service.findByEmail('test@example.com');
+      const result = await service.findByEmail('test@example.com', 'district-1');
 
       expect(result).toBeDefined();
       expect(result?.email).toBe('test@example.com');
@@ -100,10 +100,12 @@ describe('UsersService', () => {
     it('should lowercase email for search', async () => {
       prismaService.user.findUnique = jest.fn().mockResolvedValue(mockUser);
 
-      await service.findByEmail('TEST@Example.COM');
+      await service.findByEmail('TEST@Example.COM', 'district-1');
 
       expect(prismaService.user.findUnique).toHaveBeenCalledWith({
-        where: { email: 'test@example.com' },
+        where: {
+          districtId_email: { districtId: 'district-1', email: 'test@example.com' },
+        },
         select: expect.any(Object),
       });
     });

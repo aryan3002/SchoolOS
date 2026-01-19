@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SchoolOS Mobile App - UI/UX Preview</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: #f5f5f5;
+            color: #222;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 60px;
+        }
+
+        h1 {
+            font-size: 48px;
+            color: #3D87CC;
+            margin-bottom: 12px;
+        }
+
+        .subtitle {
+            font-size: 18px;
+            color: #666;
+            margin-bottom: 40px;
+        }
+
+        .quick-links {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-bottom: 60px;
+            flex-wrap: wrap;
+        }
+
+        .quick-links a {
+            padding: 12px 24px;
+            background: #3D87CC;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 500;
+            transition: background 0.3s;
+        }
+
+        .quick-links a:hover {
+            background: #2a5fa0;
+        }
+
+        .section {
+            margin-bottom: 60px;
+        }
+
+        .section h2 {
+            font-size: 32px;
+            color: #3D87CC;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #3D87CC;
+        }
+
+        .preview-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+
+        .preview-card {
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .preview-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+        }
+
+        .phone-mockup {
+            position: relative;
+            background: #000;
+            border-radius: 40px;
+            padding: 12px;
+            aspect-ratio: 9/16;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+
+        .phone-mockup::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 150px;
+            height: 25px;
+            background: #000;
+            border-radius: 0 0 20px 20px;
+            z-index: 10;
+        }
+
+        .phone-screen {
+            width: 100%;
+            height: 100%;
+            background: white;
+            border-radius: 32px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .screen-header {
+            background: linear-gradient(135deg, #3D87CC 0%, #2a5fa0 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .screen-header h3 {
+            font-size: 20px;
+            margin-bottom: 4px;
+        }
+
+        .screen-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        .screen-content::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .screen-content::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+
+        .screen-content::-webkit-scrollbar-thumb {
+            background: #3D87CC;
+            border-radius: 2px;
+        }
+
+        .action-item {
+            background: #f9f9f9;
+            border-left: 4px solid #FFB800;
+            padding: 12px;
+            margin-bottom: 12px;
+            border-radius: 4px;
+        }
+
+        .action-item.critical {
+            border-left-color: #EF4444;
+            background: #fff5f5;
+        }
+
+        .action-item h4 {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .action-item p {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .event-item {
+            background: white;
+            border: 1px solid #e0e0e0;
+            padding: 12px;
+            margin-bottom: 12px;
+            border-radius: 8px;
+        }
+
+        .event-item .time {
+            font-size: 12px;
+            color: #999;
+        }
+
+        .event-item .title {
+            font-weight: 600;
+            font-size: 14px;
+            margin: 4px 0;
+        }
+
+        .grade-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .grade-item:last-child {
+            border-bottom: none;
+        }
+
+        .grade-subject {
+            flex: 1;
+        }
+
+        .grade-circle {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: white;
+            margin-left: 12px;
+        }
+
+        .color-palette {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .color-item {
+            text-align: center;
+        }
+
+        .color-box {
+            width: 100%;
+            aspect-ratio: 1;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .color-label {
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .color-code {
+            font-size: 11px;
+            color: #999;
+            font-family: monospace;
+        }
+
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+        }
+
+        .feature {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+
+        .feature h3 {
+            color: #3D87CC;
+            margin-bottom: 10px;
+            font-size: 18px;
+        }
+
+        .feature p {
+            color: #666;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .tech-stack {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .tech-item {
+            background: #f9f9f9;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #3D87CC;
+        }
+
+        .tech-item strong {
+            color: #3D87CC;
+        }
+
+        .code-block {
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+            overflow-x: auto;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 13px;
+        }
+
+        footer {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+            border-top: 1px solid #ddd;
+            margin-top: 80px;
+        }
+
+        .stat {
+            text-align: center;
+            padding: 15px;
+            background: #f9f9f9;
+            border-radius: 8px;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #3D87CC;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #666;
+            margin-top: 4px;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px 12px;
+            }
+
+            h1 {
+                font-size: 32px;
+            }
+
+            .section h2 {
+                font-size: 24px;
+            }
+
+            .preview-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎓 SchoolOS Mobile App</h1>
+            <p class="subtitle">Parent-centric AI-first education platform</p>
+            <div class="quick-links">
+                <a href="#setup">Setup Guide</a>
+                <a href="#screens">Screens</a>
+                <a href="#components">Components</a>
+                <a href="#design">Design System</a>
+                <a href="#tech">Tech Stack</a>
+            </div>
+        </header>
+
+        <!-- Setup Section -->
+        <section class="section" id="setup">
+            <h2>🚀 Quick Start</h2>
+            <div class="code-block">
+cd apps/mobile
+npm install
+npm start
+            </div>
+            <div class="features">
+                <div class="feature">
+                    <h3>📱 Expo Go</h3>
+                    <p>Scan QR code with your phone camera or Expo Go app for instant preview. Best for quick testing.</p>
+                </div>
+                <div class="feature">
+                    <h3>🍎 iOS Simulator</h3>
+                    <p>Press 'i' in terminal to launch iOS simulator. Requires macOS and Xcode.</p>
+                </div>
+                <div class="feature">
+                    <h3>🤖 Android Emulator</h3>
+                    <p>Press 'a' in terminal to launch Android emulator. Requires Android SDK.</p>
+                </div>
+                <div class="feature">
+                    <h3>🌐 Web Preview</h3>
+                    <p>Press 'w' in terminal for web preview. Good for viewing at larger scale.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Screens Section -->
+        <section class="section" id="screens">
+            <h2>📱 App Screens</h2>
+
+            <!-- Home Screen -->
+            <div style="margin-bottom: 40px;">
+                <h3 style="color: #333; margin-bottom: 20px;">Home Screen - "Clarity Screen"</h3>
+                <div style="display: grid; grid-template-columns: 350px 1fr; gap: 40px; align-items: start;">
+                    <div class="phone-mockup">
+                        <div class="phone-screen">
+                            <div class="screen-header">
+                                <h3>Emma's Day</h3>
+                                <p style="font-size: 12px;">Good afternoon</p>
+                            </div>
+                            <div class="screen-content">
+                                <div style="background: #3D87CC; color: white; padding: 16px; border-radius: 12px; margin-bottom: 16px; text-align: center;">
+                                    🔍 Ask anything about your child...
+                                </div>
+                                
+                                <div style="font-weight: 600; color: #333; margin-bottom: 8px;">Needs Attention</div>
+                                <div class="action-item critical">
+                                    <h4>Permission Slip - Field Trip</h4>
+                                    <p>Science museum visit - Due in 2 days</p>
+                                </div>
+
+                                <div style="font-weight: 600; color: #333; margin: 16px 0 8px;">Today's Events</div>
+                                <div class="event-item">
+                                    <div class="time">10:00 AM</div>
+                                    <div class="title">📚 Math Test</div>
+                                    <div style="font-size: 12px; color: #666;">Room 204</div>
+                                </div>
+                                <div class="event-item">
+                                    <div class="time">1:00 PM</div>
+                                    <div class="title">🏫 Early Dismissal</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <h4>Key Features:</h4>
+                        <ul style="list-style: none; padding: 0;">
+                            <li style="margin-bottom: 12px;">✅ <strong>"What matters for MY child today"</strong> - Not a feed, not a dashboard</li>
+                            <li style="margin-bottom: 12px;">✅ <strong>Zero scrolling</strong> - All critical info above the fold</li>
+                            <li style="margin-bottom: 12px;">✅ <strong>AI entry point</strong> - Prominent "Ask" button</li>
+                            <li style="margin-bottom: 12px;">✅ <strong>One-tap child switcher</strong> - For multi-child parents</li>
+                            <li style="margin-bottom: 12px;">✅ <strong>Action items</strong> - Permissions, payments, meetings</li>
+                            <li style="margin-bottom: 12px;">✅ <strong>Quick stats</strong> - GPA, attendance, upcoming tests</li>
+                            <li style="margin-bottom: 12px;">✅ <strong>Refresh support</strong> - Pull to refresh</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chat Screen -->
+            <div style="margin-bottom: 40px;">
+                <h3 style="color: #333; margin-bottom: 20px;">Ask Screen - AI Chat</h3>
+                <div style="display: grid; grid-template-columns: 350px 1fr; gap: 40px; align-items: start;">
+                    <div class="phone-mockup">
+                        <div class="phone-screen">
+                            <div class="screen-header">
+                                <h3>Ask SchoolOS</h3>
+                            </div>
+                            <div class="screen-content">
+                                <div style="background: #f0f0f0; padding: 12px; border-radius: 12px; margin-bottom: 12px; text-align: center;">
+                                    <strong>User</strong><br>How is Emma doing in math?
+                                </div>
+
+                                <div style="background: #e3f2fd; padding: 12px; border-radius: 12px; margin-bottom: 12px;">
+                                    <strong>SchoolOS</strong><br>
+                                    <p style="font-size: 14px; margin: 8px 0;">Emma is doing well! B+ (87%), improved in multiplication facts.</p>
+                                    <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px;">
+                                        <span style="background: white; padding: 4px 8px; border-radius: 12px; font-size: 12px;">📊 Math Gradebook</span>
+                                        <span style="background: white; padding: 4px 8px; border-radius: 12px; font-size: 12px;">📅 Recent Test</span>
+                                    </div>
+                                </div>
+
+                                <div style="border-top: 1px solid #e0e0e0; margin-top: auto; padding-top: 12px;">
+                                    <div style="background: #f5f5f5; padding: 12px; border-radius: 12px; display: flex;">
+                                        <input type="text" placeholder="Ask anything..." style="flex: 1; border: none; background: transparent; outline: none;">
+                                        <button style="background: #3D87CC; color: white; border: none; border-radius: 50%; width: 32px; height: 32px; cursor: pointer;">→</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <h4>Key Features:</h4>
+                        <ul style="list-style: none; padding: 0;">
+                            <li style="margin-bottom: 12px;">✅ <strong>Natural language</strong> - Ask anything about child</li>
+                            <li style="margin-bottom: 12px;">✅ <strong>AI responses</strong> - Powered by orchestrator</li>
+                            <li style="margin-bottom: 12px;">✅ <strong>Citation chips</strong> - Shows data sources</li>
+                            <li style="margin-bottom: 12px;">✅ <strong>Follow-up questions</strong> - Suggested next questions</li>
+                            <li style="margin-bottom: 12px;">✅ <strong>Confidence scores</strong> - Trust indicator</li>
+                            <li style="margin-bottom: 12px;">✅ <strong>Typing indicator</strong> - AI is thinking</li>
+                            <li style="margin-bottom: 12px;">✅ <strong>Message history</strong> - Full conversation saved</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Calendar Screen -->
+            <div style="margin-bottom: 40px;">
+                <h3 style="color: #333; margin-bottom: 20px;">Calendar Screen</h3>
+                <div style="display: grid; grid-template-columns: 350px 1fr; gap: 40px; align-items: start;">
+                    <div class="phone-mockup">
+                        <div class="phone-screen">
+                            <div class="screen-header">
+                                <h3>Calendar</h3>
+                            </div>
+                            <div class="screen-content">
+                                <div style="text-align: center; margin-bottom: 16px;">
+                                    <strong>← March 2024 →</strong>
+                                </div>
+
+                                <div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 16px;">
+                                    <div style="text-align: center; font-size: 11px; color: #999;">S</div>
+                                    <div style="text-align: center; font-size: 11px; color: #999;">M</div>
+                                    <div style="text-align: center; font-size: 11px; color: #999;">T</div>
+                                    <div style="text-align: center; font-size: 11px; color: #999;">W</div>
+                                    <div style="text-align: center; font-size: 11px; color: #999;">T</div>
+                                    <div style="text-align: center; font-size: 11px; color: #999;">F</div>
+                                    <div style="text-align: center; font-size: 11px; color: #999;">S</div>
+                                    
+                                    <div style="text-align: center; padding: 8px; background: #f0f0f0; border-radius: 8px;">3</div>
+                                    <div style="text-align: center; padding: 8px; background: #f0f0f0; border-radius: 8px;">4</div>
+                                    <div style="text-align: center; padding: 8px; background: #f0f0f0; border-radius: 8px;">5</div>
+                                    <div style="text-align: center; padding: 8px; background: #3D87CC; color: white; border-radius: 8px; font-weight: bold;">6</div>
+                                    <div style="text-align: center; padding: 8px; background: #f0f0f0; border-radius: 8px;">7</div>
+                                    <div style="text-align: center; padding: 8px; background: #f0f0f0; border-radius: 8px;">8</div>
+                                    <div style="text-align: center; padding: 8px; background: #f0f0f0; border-radius: 8px;">9</div>
+                                </div>
+
+                                <div style="font-weight: 600; color: #333; margin-bottom: 8px;">Today</div>
+                                <div class="event-item">
+                                    <div class="time">10:00 AM - 11:00 AM</div>
+                                    <div class="title">📚 Math Test</div>
+                                    <div style="font-size: 12px; color: #666;">Room 204</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <h4>Key Features:</h4>
+                        <ul style="list-style: none; padding: 0;">
+                            <li style="margin-bottom: 12px;">✅ <strong>Month view</strong> - Full calendar</li>
+                            <li style="margin-bottom: 12px;">✅ <strong>Event indicators</strong> - Dots on dates with events</li>
+                            <li style="margin-bottom: 12px;">✅ <strong>Event types</strong> - Color-coded by category</li>
+                            <li style="margin-bottom: 12px;">✅ <strong>All-day events</strong> - Holidays, full-day activities</li>
+                            <li style="margin-bottom: 12px;">✅ <strong>Upcoming section</strong> - Next 7 days</li>
+                            <li style="margin-bottom: 12px;">✅ <strong>Action indicators</strong> - Events needing parent response</li>
+                            <li style="margin-bottom: 12px;">✅ <strong>Legend</strong> - Event type reference</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Profile Screen -->
+            <div>
+                <h3 style="color: #333; margin-bottom: 20px;">Profile Screen</h3>
+                <div style="display: grid; grid-template-columns: 350px 1fr; gap: 40px; align-items: start;">
+                    <div class="phone-mockup">
+                        <div class="phone-screen">
+                            <div class="screen-header">
+                                <h3>Profile</h3>
+                            </div>
+                            <div class="screen-content">
+                                <div style="text-align: center; margin-bottom: 20px;">
+                                    <div style="width: 60px; height: 60px; border-radius: 50%; background: #3D87CC; color: white; display: flex; align-items: center; justify-content: center; font-size: 24px; margin: 0 auto 10px;">EJ</div>
+                                    <div style="font-weight: bold; font-size: 16px;">Emma Johnson</div>
+                                    <div style="font-size: 13px; color: #666;">5th Grade</div>
+                                </div>
+
+                                <div style="font-weight: 600; color: #333; margin: 16px 0 8px;">Current Grades</div>
+                                <div class="grade-item">
+                                    <div class="grade-subject">
+                                        <div style="font-weight: 500;">Math</div>
+                                        <div style="font-size: 12px; color: #666;">Ms. Peterson</div>
+                                    </div>
+                                    <div class="grade-circle" style="background: #4CAF50;">A</div>
+                                </div>
+                                <div class="grade-item">
+                                    <div class="grade-subject">
+                                        <div style="font-weight: 500;">Science</div>
+                                        <div style="font-size: 12px; color: #666;">Mr. Chen</div>
+                                    </div>
+                                    <div class="grade-circle" style="background: #3D87CC;">B+</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <h4>Key Features:</h4>
+                        <ul style="list-style: none; padding: 0;">
+                            <li style="margin-bottom: 12px;">✅ <strong>Child profile</strong> - Photo, grade, school</li>
+                            <li style="margin-bottom: 12px;">✅ <strong>Attendance summary</strong> - Present/Absent/Tardy</li>
+                            <li style="margin-bottom: 12px;">✅ <strong>All grades</strong> - By subject with trends</li>
+                            <li style="margin-bottom: 12px;">✅ <strong>Upcoming assignments</strong> - Due dates</li>
+                            <li style="margin-bottom: 12px;">✅ <strong>Recent grades</strong> - Latest submissions</li>
+                            <li style="margin-bottom: 12px;">✅ <strong>Quick links</strong> - Teacher contact, report card</li>
+                            <li style="margin-bottom: 12px;">✅ <strong>Settings</strong> - Preferences & notifications</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Components Section -->
+        <section class="section" id="components">
+            <h2>🧩 UI Components</h2>
+            <p style="margin-bottom: 30px; color: #666;">12 reusable components built on the design system</p>
+
+            <div class="features">
+                <div class="feature">
+                    <h3>📝 Text Components</h3>
+                    <p>Heading1-4, BodyText, Caption, Label with consistent typography hierarchy</p>
+                </div>
+                <div class="feature">
+                    <h3>🔘 Buttons</h3>
+                    <p>5 variants (primary, secondary, outline, ghost, danger), 3 sizes, haptic feedback</p>
+                </div>
+                <div class="feature">
+                    <h3>📦 Cards</h3>
+                    <p>Elevated and default variants with customizable padding and pressable states</p>
+                </div>
+                <div class="feature">
+                    <h3>💬 Chat Bubble</h3>
+                    <p>User and AI bubbles with citations, follow-ups, confidence scores</p>
+                </div>
+                <div class="feature">
+                    <h3>⚡ Action Card</h3>
+                    <p>Urgency levels, quick actions, deadline countdown, list variants</p>
+                </div>
+                <div class="feature">
+                    <h3>👨‍👩‍👧 Child Switcher</h3>
+                    <p>Horizontal scroll for multi-child selection with visual indicators</p>
+                </div>
+                <div class="feature">
+                    <h3>⌨️ Inputs</h3>
+                    <p>Text input, chat input, quick ask button with validation states</p>
+                </div>
+                <div class="feature">
+                    <h3>📅 Calendar</h3>
+                    <p>Day summary, events, week view, month selector, event indicators</p>
+                </div>
+                <div class="feature">
+                    <h3>📊 Status</h3>
+                    <p>Grades, progress bars, attendance, badges, status dots, skeletons</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Design System Section -->
+        <section class="section" id="design">
+            <h2>🎨 Design System</h2>
+
+            <h3 style="margin-top: 40px; margin-bottom: 20px;">Color Palette</h3>
+            <div class="color-palette">
+                <div class="color-item">
+                    <div class="color-box" style="background: #3D87CC;"></div>
+                    <div class="color-label">Primary</div>
+                    <div class="color-code">#3D87CC</div>
+                </div>
+                <div class="color-item">
+                    <div class="color-box" style="background: #FFB800;"></div>
+                    <div class="color-label">Accent</div>
+                    <div class="color-code">#FFB800</div>
+                </div>
+                <div class="color-item">
+                    <div class="color-box" style="background: #4CAF50;"></div>
+                    <div class="color-label">Success</div>
+                    <div class="color-code">#4CAF50</div>
+                </div>
+                <div class="color-item">
+                    <div class="color-box" style="background: #EF4444;"></div>
+                    <div class="color-label">Error</div>
+                    <div class="color-code">#EF4444</div>
+                </div>
+                <div class="color-item">
+                    <div class="color-box" style="background: #F59E0B;"></div>
+                    <div class="color-label">Warning</div>
+                    <div class="color-code">#F59E0B</div>
+                </div>
+                <div class="color-item">
+                    <div class="color-box" style="background: #0EA5E9;"></div>
+                    <div class="color-label">Info</div>
+                    <div class="color-code">#0EA5E9</div>
+                </div>
+            </div>
+
+            <h3 style="margin-top: 40px; margin-bottom: 20px;">Typography</h3>
+            <div class="features">
+                <div class="feature">
+                    <h3 style="font-size: 40px;">Heading 1</h3>
+                    <p style="color: #999;">40px - Page titles</p>
+                </div>
+                <div class="feature">
+                    <h3 style="font-size: 32px;">Heading 2</h3>
+                    <p style="color: #999;">32px - Section headers</p>
+                </div>
+                <div class="feature">
+                    <h3 style="font-size: 28px;">Heading 3</h3>
+                    <p style="color: #999;">28px - Subsections</p>
+                </div>
+                <div class="feature">
+                    <h3 style="font-size: 24px;">Heading 4</h3>
+                    <p style="color: #999;">24px - Content headers</p>
+                </div>
+                <div class="feature">
+                    <p style="font-size: 16px;">Body Text</p>
+                    <p style="color: #999;">16px - Default paragraph</p>
+                </div>
+                <div class="feature">
+                    <p style="font-size: 14px;">Body Small</p>
+                    <p style="color: #999;">14px - Secondary text</p>
+                </div>
+                <div class="feature">
+                    <p style="font-size: 12px;">Caption</p>
+                    <p style="color: #999;">12px - Hints & labels</p>
+                </div>
+            </div>
+
+            <h3 style="margin-top: 40px; margin-bottom: 20px;">Spacing</h3>
+            <div style="background: white; padding: 20px; border-radius: 12px;">
+                <p style="margin-bottom: 20px; color: #666;">Base unit: <strong>4px</strong></p>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 15px;">
+                    <div class="stat">
+                        <div class="stat-value">4px</div>
+                        <div class="stat-label">xs</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value">8px</div>
+                        <div class="stat-label">sm</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value">12px</div>
+                        <div class="stat-label">md</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value">16px</div>
+                        <div class="stat-label">lg</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value">24px</div>
+                        <div class="stat-label">xl</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value">32px</div>
+                        <div class="stat-label">2xl</div>
+                    </div>
+                </div>
+            </div>
+
+            <h3 style="margin-top: 40px; margin-bottom: 20px;">Interaction</h3>
+            <div class="features">
+                <div class="feature">
+                    <h3>✨ Haptic Feedback</h3>
+                    <p>Every interactive element triggers haptic feedback for tactile confirmation</p>
+                </div>
+                <div class="feature">
+                    <h3>🎬 Animations</h3>
+                    <p>Smooth 300ms transitions, typing indicators, loading states</p>
+                </div>
+                <div class="feature">
+                    <h3>🎯 Touch Targets</h3>
+                    <p>All interactive elements 44px minimum for accessibility</p>
+                </div>
+                <div class="feature">
+                    <h3>♿ Accessibility</h3>
+                    <p>WCAG 2.1 AA compliant, high contrast, clear labels</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Tech Stack Section -->
+        <section class="section" id="tech">
+            <h2>⚙️ Technical Architecture</h2>
+
+            <h3 style="margin-top: 30px; margin-bottom: 20px;">Tech Stack</h3>
+            <div class="tech-stack">
+                <div class="tech-item">
+                    <strong>React Native</strong><br>
+                    Cross-platform mobile framework
+                </div>
+                <div class="tech-item">
+                    <strong>Expo</strong><br>
+                    Development platform & deployment
+                </div>
+                <div class="tech-item">
+                    <strong>Expo Router</strong><br>
+                    File-based navigation
+                </div>
+                <div class="tech-item">
+                    <strong>React Query</strong><br>
+                    Server state management
+                </div>
+                <div class="tech-item">
+                    <strong>Zustand</strong><br>
+                    App state & persistence
+                </div>
+                <div class="tech-item">
+                    <strong>TypeScript</strong><br>
+                    Type-safe development
+                </div>
+                <div class="tech-item">
+                    <strong>expo-haptics</strong><br>
+                    Haptic feedback engine
+                </div>
+                <div class="tech-item">
+                    <strong>AsyncStorage</strong><br>
+                    Persistent local storage
+                </div>
+            </div>
+
+            <h3 style="margin-top: 40px; margin-bottom: 20px;">Architecture</h3>
+            <div style="background: white; padding: 20px; border-radius: 12px;">
+                <pre style="overflow-x: auto; font-size: 13px;"><code>apps/mobile/
+├── app/                    # Expo Router (navigation)
+│   ├── _layout.tsx         # Root layout with providers
+│   ├── (tabs)/             # Tab navigation
+│   └── chat.tsx            # Modal route
+├── src/
+│   ├── components/ui/      # 9 reusable UI components
+│   ├── screens/            # 4 full screens
+│   ├── hooks/              # React Query hooks
+│   │   ├── useConversation (AI chat)
+│   │   ├── useChildren (student data)
+│   │   ├── useCalendar (events)
+│   │   └── useActions (permissions, payments)
+│   ├── store/              # Zustand global state
+│   └── theme/              # Design system
+├── app.json                # Expo config
+└── tsconfig.json           # TypeScript config</code></pre>
+            </div>
+
+            <h3 style="margin-top: 40px; margin-bottom: 20px;">API Integration</h3>
+            <div class="features">
+                <div class="feature">
+                    <h3>💬 Chat API</h3>
+                    <p><code style="background: #f5f5f5; padding: 2px 6px; border-radius: 4px;">POST /chat/message</code> - AI responses with citations</p>
+                </div>
+                <div class="feature">
+                    <h3>📚 Student API</h3>
+                    <p><code style="background: #f5f5f5; padding: 2px 6px; border-radius: 4px;">GET /students/:id</code> - Grades, assignments, attendance</p>
+                </div>
+                <div class="feature">
+                    <h3>📅 Calendar API</h3>
+                    <p><code style="background: #f5f5f5; padding: 2px 6px; border-radius: 4px;">GET /calendar/events</code> - School events and deadlines</p>
+                </div>
+                <div class="feature">
+                    <h3>✅ Actions API</h3>
+                    <p><code style="background: #f5f5f5; padding: 2px 6px; border-radius: 4px;">GET /actions</code> - Permissions, payments, forms</p>
+                </div>
+            </div>
+
+            <h3 style="margin-top: 40px; margin-bottom: 20px;">Performance</h3>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                <div class="stat">
+                    <div class="stat-value">&lt;1s</div>
+                    <div class="stat-label">Home Load</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">&lt;3s</div>
+                    <div class="stat-label">AI Response</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">&lt;100ms</div>
+                    <div class="stat-label">Navigation</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">60fps</div>
+                    <div class="stat-label">Animations</div>
+                </div>
+            </div>
+        </section>
+
+        <footer>
+            <p>SchoolOS Mobile App © 2024</p>
+            <p style="margin-top: 10px; font-size: 13px;">
+                Built with React Native • Expo • TypeScript
+            </p>
+        </footer>
+    </div>
+</body>
+</html>

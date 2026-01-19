@@ -28,11 +28,11 @@ import { SkywardMapper } from './skyward.mapper';
  * Skyward Connector implementation.
  */
 export class SkywardConnector implements SISConnector {
-  private readonly client: SkywardClient;
+  private client: SkywardClient;
   private readonly mapper: SkywardMapper;
 
   constructor(
-    private readonly credentials: SISCredentials,
+    private credentials: SISCredentials,
     private readonly prisma: PrismaClient,
     private readonly logger: Logger,
   ) {
@@ -44,7 +44,11 @@ export class SkywardConnector implements SISConnector {
   }
 
   async authenticate(credentials: SISCredentials): Promise<SISConnection> {
-    this.credentials.baseUrl = credentials.baseUrl;
+    this.credentials = credentials;
+    this.client = new SkywardClient(
+      credentials,
+      this.logger.child ? this.logger.child({ vendor: 'skyward' }) : this.logger,
+    );
     return this.client.authenticate();
   }
 
