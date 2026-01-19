@@ -421,137 +421,88 @@ async function main(): Promise<void> {
   // ============================================================
   console.log('\nCreating relationships...');
 
-  // Parent-child relationships
-  await prisma.userRelationship.upsert({
-    where: {
-      userId_relatedUserId_relationshipType_sectionId: {
+  // Delete existing relationships first to avoid conflicts with nullable sectionId
+  await prisma.userRelationship.deleteMany({
+    where: { districtId: lincolnDistrict.id }
+  });
+
+  // Create relationships using createMany
+  await prisma.userRelationship.createMany({
+    data: [
+      // Parent-child: Robert Davis -> Emma
+      {
+        districtId: lincolnDistrict.id,
         userId: parentDavis.id,
         relatedUserId: studentEmma.id,
         relationshipType: RelationshipType.PARENT_OF,
-        sectionId: null as unknown as string,
-      },
-    },
-    update: {},
-    create: {
-      districtId: lincolnDistrict.id,
-      userId: parentDavis.id,
-      relatedUserId: studentEmma.id,
-      relationshipType: RelationshipType.PARENT_OF,
-      status: RelationshipStatus.ACTIVE,
-      metadata: {
+        status: RelationshipStatus.ACTIVE,
         isPrimary: true,
-        canPickup: true,
-        emergencyContact: true,
-        relationship: 'father',
+        metadata: { canPickup: true, emergencyContact: true, relationship: 'father' },
+        approvedBy: adminUser.id,
+        approvedAt: new Date(),
       },
-      approvedBy: adminUser.id,
-      approvedAt: new Date(),
-    },
-  });
-
-  await prisma.userRelationship.upsert({
-    where: {
-      userId_relatedUserId_relationshipType_sectionId: {
+      // Parent-child: Susan Davis -> Emma
+      {
+        districtId: lincolnDistrict.id,
         userId: parentDavis2.id,
         relatedUserId: studentEmma.id,
         relationshipType: RelationshipType.PARENT_OF,
-        sectionId: null as unknown as string,
-      },
-    },
-    update: {},
-    create: {
-      districtId: lincolnDistrict.id,
-      userId: parentDavis2.id,
-      relatedUserId: studentEmma.id,
-      relationshipType: RelationshipType.PARENT_OF,
-      status: RelationshipStatus.ACTIVE,
-      metadata: {
+        status: RelationshipStatus.ACTIVE,
         isPrimary: false,
-        canPickup: true,
-        emergencyContact: true,
-        relationship: 'mother',
+        metadata: { canPickup: true, emergencyContact: true, relationship: 'mother' },
+        approvedBy: adminUser.id,
+        approvedAt: new Date(),
       },
-      approvedBy: adminUser.id,
-      approvedAt: new Date(),
-    },
-  });
-
-  await prisma.userRelationship.upsert({
-    where: {
-      userId_relatedUserId_relationshipType_sectionId: {
+      // Parent-child: Robert Davis -> Jacob
+      {
+        districtId: lincolnDistrict.id,
         userId: parentDavis.id,
         relatedUserId: studentJacob.id,
         relationshipType: RelationshipType.PARENT_OF,
-        sectionId: null as unknown as string,
-      },
-    },
-    update: {},
-    create: {
-      districtId: lincolnDistrict.id,
-      userId: parentDavis.id,
-      relatedUserId: studentJacob.id,
-      relationshipType: RelationshipType.PARENT_OF,
-      status: RelationshipStatus.ACTIVE,
-      metadata: {
+        status: RelationshipStatus.ACTIVE,
         isPrimary: true,
-        canPickup: true,
-        emergencyContact: true,
-        relationship: 'father',
+        metadata: { canPickup: true, emergencyContact: true, relationship: 'father' },
+        approvedBy: adminUser.id,
+        approvedAt: new Date(),
       },
-      approvedBy: adminUser.id,
-      approvedAt: new Date(),
-    },
-  });
-
-  // Teacher-student relationships (via sections)
-  await prisma.userRelationship.upsert({
-    where: {
-      userId_relatedUserId_relationshipType_sectionId: {
+      // Parent-child: Susan Davis -> Jacob
+      {
+        districtId: lincolnDistrict.id,
+        userId: parentDavis2.id,
+        relatedUserId: studentJacob.id,
+        relationshipType: RelationshipType.PARENT_OF,
+        status: RelationshipStatus.ACTIVE,
+        isPrimary: false,
+        metadata: { canPickup: true, emergencyContact: true, relationship: 'mother' },
+        approvedBy: adminUser.id,
+        approvedAt: new Date(),
+      },
+      // Teacher-student: Ms. Smith teaches Emma (Algebra)
+      {
+        districtId: lincolnDistrict.id,
         userId: teacherSmith.id,
         relatedUserId: studentEmma.id,
         relationshipType: RelationshipType.TEACHER_OF,
+        status: RelationshipStatus.ACTIVE,
         sectionId: algebraSection.id,
+        metadata: { role: 'lead' },
+        approvedBy: adminUser.id,
+        approvedAt: new Date(),
       },
-    },
-    update: {},
-    create: {
-      districtId: lincolnDistrict.id,
-      userId: teacherSmith.id,
-      relatedUserId: studentEmma.id,
-      relationshipType: RelationshipType.TEACHER_OF,
-      status: RelationshipStatus.ACTIVE,
-      sectionId: algebraSection.id,
-      metadata: {
-        role: 'lead',
-      },
-      approvedBy: adminUser.id,
-      approvedAt: new Date(),
-    },
-  });
-
-  await prisma.userRelationship.upsert({
-    where: {
-      userId_relatedUserId_relationshipType_sectionId: {
+      // Teacher-student: Mr. Johnson teaches Emma (English)
+      {
+        districtId: lincolnDistrict.id,
         userId: teacherJohnson.id,
         relatedUserId: studentEmma.id,
         relationshipType: RelationshipType.TEACHER_OF,
+        status: RelationshipStatus.ACTIVE,
         sectionId: englishSection.id,
+        metadata: { role: 'lead' },
+        approvedBy: adminUser.id,
+        approvedAt: new Date(),
       },
-    },
-    update: {},
-    create: {
-      districtId: lincolnDistrict.id,
-      userId: teacherJohnson.id,
-      relatedUserId: studentEmma.id,
-      relationshipType: RelationshipType.TEACHER_OF,
-      status: RelationshipStatus.ACTIVE,
-      sectionId: englishSection.id,
-      metadata: {
-        role: 'lead',
-      },
-      approvedBy: adminUser.id,
-      approvedAt: new Date(),
-    },
+    ],
+    skipDuplicates: true,
   });
 
   console.log('  ✓ Created parent-child relationships');

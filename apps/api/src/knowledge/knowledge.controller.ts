@@ -32,6 +32,8 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { KnowledgeSourceStatus, KnowledgeSourceType } from '@prisma/client';
+import { IsOptional, IsString, IsNumber, IsEnum, IsBoolean, IsDateString, IsArray, IsUUID, Min, Max } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
 
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -58,44 +60,150 @@ interface MulterFile {
 
 // DTOs for request/response
 class UploadDocumentDto {
+  @IsString()
   title!: string;
+  
+  @IsOptional()
+  @IsString()
   description?: string;
+  
+  @IsEnum(KnowledgeSourceType)
   documentType!: KnowledgeSourceType;
+  
+  @IsOptional()
+  @IsString()
   category?: string;
+  
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
   tags?: string[];
+  
+  @IsOptional()
+  @IsDateString()
   expiresAt?: Date;
 }
 
 class UpdateSourceDto {
+  @IsOptional()
+  @IsString()
   title?: string;
+  
+  @IsOptional()
+  @IsString()
   description?: string;
+  
+  @IsOptional()
+  @IsString()
   category?: string;
+  
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
   tags?: string[];
+  
+  @IsOptional()
+  @IsDateString()
   expiresAt?: Date;
 }
 
 class SearchQueryDto {
+  @IsString()
   query!: string;
+  
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(1)
+  @Max(100)
   limit?: number;
+  
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
   offset?: number;
+  
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
   sourceTypes?: string[];
+  
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
   categories?: string[];
+  
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
   tags?: string[];
+  
+  @IsOptional()
+  @IsArray()
+  @IsUUID('4', { each: true })
   sourceIds?: string[];
+  
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  @Max(1)
   vectorWeight?: number;
+  
+  @IsOptional()
+  @Transform(({ value }) => value === 'true' || value === true)
+  @IsBoolean()
   useReranking?: boolean;
+  
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  @Max(1)
   minScore?: number;
 }
 
 class ListSourcesQueryDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(1)
   page?: number;
+  
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(1)
+  @Max(100)
   pageSize?: number;
+  
+  @IsOptional()
+  @IsEnum(KnowledgeSourceStatus)
   status?: KnowledgeSourceStatus;
+  
+  @IsOptional()
+  @IsEnum(KnowledgeSourceType)
   sourceType?: KnowledgeSourceType;
+  
+  @IsOptional()
+  @IsString()
   category?: string;
+  
+  @IsOptional()
+  @IsString()
   tags?: string;
+  
+  @IsOptional()
+  @IsString()
   searchQuery?: string;
+  
+  @IsOptional()
+  @IsDateString()
   createdAfter?: string;
+  
+  @IsOptional()
+  @IsDateString()
   createdBefore?: string;
 }
 

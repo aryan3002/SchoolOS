@@ -169,8 +169,30 @@ export class AuthService {
    * Authenticate user with email and password
    */
   async login(dto: LoginDto): Promise<AuthResponse> {
+    // Support both UUID and slug for districtId
+    let districtId = dto.districtId;
+    
+    // Check if it's a UUID or a slug
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(dto.districtId);
+    
+    if (!isUuid) {
+      // It's a slug, look up the district
+      const district = await this.prisma.district.findUnique({
+        where: { slug: dto.districtId },
+      });
+      
+      if (!district) {
+        throw new UnauthorizedException({
+          code: 'INVALID_DISTRICT',
+          message: 'District not found',
+        });
+      }
+      
+      districtId = district.id;
+    }
+
     const user = await this.prisma.user.findFirst({
-      where: { email: dto.email, districtId: dto.districtId },
+      where: { email: dto.email, districtId },
     });
 
     if (!user) {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Header } from '@/components/layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,7 +19,6 @@ import {
   Upload,
   Search,
   Filter,
-  MoreVertical,
   Eye,
   Pencil,
   Trash2,
@@ -30,121 +29,117 @@ import {
   Clock,
   XCircle,
   FolderOpen,
+  Loader2,
+  RefreshCw,
 } from 'lucide-react';
-import { formatDate, formatRelativeTime } from '@/lib/utils';
-
-// Mock data
-const documents = [
-  {
-    id: '1',
-    title: 'Student Handbook 2024-2025',
-    category: 'Policies',
-    status: 'approved',
-    uploadedBy: 'Dr. Sarah Johnson',
-    uploadedAt: new Date('2024-08-15'),
-    lastUpdated: new Date('2024-08-20'),
-    fileType: 'PDF',
-    fileSize: '2.4 MB',
-    chunks: 156,
-    views: 1234,
-  },
-  {
-    id: '2',
-    title: 'Transportation Routes & Schedules',
-    category: 'Transportation',
-    status: 'approved',
-    uploadedBy: 'Michael Chen',
-    uploadedAt: new Date('2024-08-10'),
-    lastUpdated: new Date('2024-09-01'),
-    fileType: 'PDF',
-    fileSize: '1.8 MB',
-    chunks: 89,
-    views: 2567,
-  },
-  {
-    id: '3',
-    title: 'Lunch Menu - September 2024',
-    category: 'Food Services',
-    status: 'approved',
-    uploadedBy: 'Lisa Martinez',
-    uploadedAt: new Date('2024-08-28'),
-    lastUpdated: new Date('2024-08-28'),
-    fileType: 'PDF',
-    fileSize: '850 KB',
-    chunks: 24,
-    views: 4521,
-  },
-  {
-    id: '4',
-    title: 'After School Programs Guide',
-    category: 'Programs',
-    status: 'pending',
-    uploadedBy: 'James Wilson',
-    uploadedAt: new Date('2024-09-02'),
-    lastUpdated: new Date('2024-09-02'),
-    fileType: 'DOCX',
-    fileSize: '1.2 MB',
-    chunks: 67,
-    views: 0,
-  },
-  {
-    id: '5',
-    title: 'Emergency Procedures Manual',
-    category: 'Safety',
-    status: 'approved',
-    uploadedBy: 'Dr. Sarah Johnson',
-    uploadedAt: new Date('2024-07-01'),
-    lastUpdated: new Date('2024-08-15'),
-    fileType: 'PDF',
-    fileSize: '3.1 MB',
-    chunks: 203,
-    views: 892,
-  },
-  {
-    id: '6',
-    title: 'Athletic Registration Forms',
-    category: 'Athletics',
-    status: 'rejected',
-    uploadedBy: 'Robert Taylor',
-    uploadedAt: new Date('2024-09-01'),
-    lastUpdated: new Date('2024-09-03'),
-    fileType: 'PDF',
-    fileSize: '456 KB',
-    chunks: 0,
-    views: 0,
-    rejectionReason: 'Missing required consent sections',
-  },
-];
+import { formatDate } from '@/lib/utils';
+import { useKnowledgeSources, useDeleteKnowledge, usePublishKnowledge } from '@/lib/hooks';
+import { KnowledgeSource, KnowledgeSourceStatus } from '@/lib/api/knowledge';
+import { toast } from 'sonner';
 
 const categories = [
   'All Categories',
-  'Policies',
-  'Transportation',
-  'Food Services',
-  'Programs',
-  'Safety',
-  'Athletics',
-  'Academics',
-  'Events',
+  'policies',
+  'transportation',
+  'food-services',
+  'programs',
+  'safety',
+  'athletics',
+  'academics',
+  'events',
 ];
 
-const statusConfig = {
-  approved: { label: 'Approved', variant: 'success' as const, icon: CheckCircle },
-  pending: { label: 'Pending Review', variant: 'warning' as const, icon: Clock },
-  rejected: { label: 'Rejected', variant: 'destructive' as const, icon: XCircle },
+const statusConfig: Record<KnowledgeSourceStatus, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline'; icon: typeof CheckCircle }> = {
+  PUBLISHED: { label: 'Published', variant: 'default', icon: CheckCircle },
+  PENDING_REVIEW: { label: 'Pending Review', variant: 'secondary', icon: Clock },
+  DRAFT: { label: 'Draft', variant: 'outline', icon: Clock },
+  ARCHIVED: { label: 'Archived', variant: 'secondary', icon: XCircle },
+  EXPIRED: { label: 'Expired', variant: 'destructive', icon: XCircle },
 };
 
 export default function KnowledgePage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('All Categories');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState<KnowledgeSourceStatus | 'all'>('all');
 
-  const filteredDocs = documents.filter((doc) => {
-    const matchesSearch = doc.title.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = categoryFilter === 'All Categories' || doc.category === categoryFilter;
-    const matchesStatus = statusFilter === 'all' || doc.status === statusFilter;
-    return matchesSearch && matchesCategory && matchesStatus;
+  // Fetch knowledge sources from API
+  const { data, isLoading, error, refetch } = useKnowledgeSources({
+    status: statusFilter !== 'all' ? statusFilter : undefined,
+    category: categoryFilter !== 'All Categories' ? categoryFilter : undefined,
+    searchQuery: searchQuery || undefined,
   });
+
+  const deleteMutation = useDeleteKnowledge();
+  const publishMutation = usePublishKnowledge();
+
+  const sources = data?.items || [];
+  const total = data?.pagination?.total || 0;
+
+  // Filter documents client-side for immediate feedback
+  const filteredDocs = sources.filter((doc) => {
+    const matchesSearch = searchQuery 
+      ? doc.title.toLowerCase().includes(searchQuery.toLowerCase())
+      : true;
+    return matchesSearch;
+  });
+
+  // Calculate stats
+  const publishedCount = sources.filter(d => d.status === 'PUBLISHED').length;
+  const pendingCount = sources.filter(d => d.status === 'PENDING_REVIEW' || d.status === 'DRAFT').length;
+  const totalChunks = sources.reduce((acc, d) => acc + (d._count?.chunks || 0), 0);
+
+  const handleDelete = async (id: string) => {
+    if (confirm('Are you sure you want to delete this document?')) {
+      try {
+        await deleteMutation.mutateAsync(id);
+        toast.success('Document deleted successfully');
+      } catch (err) {
+        toast.error('Failed to delete document');
+      }
+    }
+  };
+
+  const handlePublish = async (id: string) => {
+    try {
+      await publishMutation.mutateAsync(id);
+      toast.success('Document published successfully');
+    } catch (err) {
+      toast.error('Failed to publish document');
+    }
+  };
+
+  const formatFileSize = (bytes: number | null) => {
+    if (!bytes) return 'N/A';
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  if (error) {
+    return (
+      <div className="flex flex-col">
+        <Header 
+          title="Knowledge Base" 
+          description="Manage documents that power your AI assistant"
+        />
+        <div className="flex-1 p-6">
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center py-12">
+              <XCircle className="h-12 w-12 text-destructive mb-4" />
+              <h3 className="text-lg font-medium">Failed to load documents</h3>
+              <p className="text-muted-foreground mt-1">
+                {error instanceof Error ? error.message : 'Please check your connection and try again'}
+              </p>
+              <Button onClick={() => refetch()} className="mt-4">
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Retry
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col">
@@ -169,7 +164,7 @@ export default function KnowledgePage() {
                 <FileText className="h-5 w-5 text-blue-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{documents.length}</p>
+                <p className="text-2xl font-bold">{total}</p>
                 <p className="text-xs text-muted-foreground">Total Documents</p>
               </div>
             </CardContent>
@@ -180,10 +175,8 @@ export default function KnowledgePage() {
                 <CheckCircle className="h-5 w-5 text-green-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold">
-                  {documents.filter(d => d.status === 'approved').length}
-                </p>
-                <p className="text-xs text-muted-foreground">Approved</p>
+                <p className="text-2xl font-bold">{publishedCount}</p>
+                <p className="text-xs text-muted-foreground">Published</p>
               </div>
             </CardContent>
           </Card>
@@ -193,10 +186,8 @@ export default function KnowledgePage() {
                 <Clock className="h-5 w-5 text-amber-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold">
-                  {documents.filter(d => d.status === 'pending').length}
-                </p>
-                <p className="text-xs text-muted-foreground">Pending Review</p>
+                <p className="text-2xl font-bold">{pendingCount}</p>
+                <p className="text-xs text-muted-foreground">Pending/Draft</p>
               </div>
             </CardContent>
           </Card>
@@ -206,9 +197,7 @@ export default function KnowledgePage() {
                 <FolderOpen className="h-5 w-5 text-purple-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold">
-                  {documents.reduce((acc, d) => acc + d.chunks, 0)}
-                </p>
+                <p className="text-2xl font-bold">{totalChunks}</p>
                 <p className="text-xs text-muted-foreground">Knowledge Chunks</p>
               </div>
             </CardContent>
@@ -237,20 +226,21 @@ export default function KnowledgePage() {
                   <SelectContent>
                     {categories.map((cat) => (
                       <SelectItem key={cat} value={cat}>
-                        {cat}
+                        {cat === 'All Categories' ? cat : cat.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as KnowledgeSourceStatus | 'all')}>
                   <SelectTrigger className="w-[150px]">
                     <SelectValue placeholder="Status" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Status</SelectItem>
-                    <SelectItem value="approved">Approved</SelectItem>
-                    <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="rejected">Rejected</SelectItem>
+                    <SelectItem value="PUBLISHED">Published</SelectItem>
+                    <SelectItem value="PENDING_REVIEW">Pending Review</SelectItem>
+                    <SelectItem value="DRAFT">Draft</SelectItem>
+                    <SelectItem value="ARCHIVED">Archived</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -263,67 +253,103 @@ export default function KnowledgePage() {
           <CardHeader>
             <CardTitle>Documents</CardTitle>
             <CardDescription>
-              {filteredDocs.length} document{filteredDocs.length !== 1 ? 's' : ''} found
+              {isLoading ? 'Loading...' : `${filteredDocs.length} document${filteredDocs.length !== 1 ? 's' : ''} found`}
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
-              {filteredDocs.map((doc) => {
-                const StatusIcon = statusConfig[doc.status].icon;
-                return (
-                  <div
-                    key={doc.id}
-                    className="flex items-center gap-4 rounded-lg border p-4 hover:bg-muted/50 transition-colors"
-                  >
-                    <div className="rounded-lg bg-muted p-3">
-                      <FileText className="h-6 w-6 text-muted-foreground" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-medium truncate">{doc.title}</h3>
-                        <Badge variant={statusConfig[doc.status].variant}>
-                          <StatusIcon className="mr-1 h-3 w-3" />
-                          {statusConfig[doc.status].label}
-                        </Badge>
+            {isLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : filteredDocs.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <FileText className="h-12 w-12 text-muted-foreground mb-4" />
+                <h3 className="text-lg font-medium">No documents found</h3>
+                <p className="text-muted-foreground mt-1">
+                  {searchQuery || categoryFilter !== 'All Categories' || statusFilter !== 'all'
+                    ? 'Try adjusting your filters'
+                    : 'Upload your first document to get started'}
+                </p>
+                <Link href="/knowledge/upload">
+                  <Button className="mt-4">
+                    <Upload className="mr-2 h-4 w-4" />
+                    Upload Document
+                  </Button>
+                </Link>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {filteredDocs.map((doc) => {
+                  const config = statusConfig[doc.status] || statusConfig.DRAFT;
+                  const StatusIcon = config.icon;
+                  return (
+                    <div
+                      key={doc.id}
+                      className="flex items-center gap-4 rounded-lg border p-4 hover:bg-muted/50 transition-colors"
+                    >
+                      <div className="rounded-lg bg-muted p-3">
+                        <FileText className="h-6 w-6 text-muted-foreground" />
                       </div>
-                      <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <FolderOpen className="h-3 w-3" />
-                          {doc.category}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <User className="h-3 w-3" />
-                          {doc.uploadedBy}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Calendar className="h-3 w-3" />
-                          {formatDate(doc.uploadedAt)}
-                        </span>
-                        <span>{doc.fileType} • {doc.fileSize}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-medium truncate">{doc.title}</h3>
+                          <Badge variant={config.variant}>
+                            <StatusIcon className="mr-1 h-3 w-3" />
+                            {config.label}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
+                          {doc.category && (
+                            <span className="flex items-center gap-1">
+                              <FolderOpen className="h-3 w-3" />
+                              {doc.category}
+                            </span>
+                          )}
+                          <span className="flex items-center gap-1">
+                            <Calendar className="h-3 w-3" />
+                            {formatDate(doc.createdAt)}
+                          </span>
+                          <span>{doc.sourceType} • {formatFileSize(doc.fileSize)}</span>
+                        </div>
+                      </div>
+                      <div className="text-right text-sm text-muted-foreground">
+                        <p>{doc._count?.chunks || 0} chunks</p>
+                        <p>v{doc.version}</p>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Button variant="ghost" size="icon" title="View">
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" title="Edit">
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        {doc.status === 'DRAFT' && (
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            title="Publish"
+                            onClick={() => handlePublish(doc.id)}
+                            disabled={publishMutation.isPending}
+                          >
+                            <CheckCircle className="h-4 w-4 text-green-600" />
+                          </Button>
+                        )}
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="text-destructive"
+                          title="Delete"
+                          onClick={() => handleDelete(doc.id)}
+                          disabled={deleteMutation.isPending}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
                     </div>
-                    <div className="text-right text-sm text-muted-foreground">
-                      <p>{doc.chunks} chunks</p>
-                      <p>{doc.views.toLocaleString()} views</p>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Button variant="ghost" size="icon">
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon">
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon">
-                        <Download className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="text-destructive">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

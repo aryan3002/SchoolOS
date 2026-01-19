@@ -35,7 +35,8 @@ export class LoginDto {
   @IsBoolean()
   rememberMe?: boolean;
 
-  @IsUUID('4', { message: 'Invalid district ID' })
+  @IsString()
+  @IsNotEmpty({ message: 'District ID or slug is required' })
   districtId!: string;
 }
 
