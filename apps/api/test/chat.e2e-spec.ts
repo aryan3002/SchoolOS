@@ -507,19 +507,17 @@ describe('Chat E2E Smoke Test (Phase 0 Lock)', () => {
 
       const messageId = response.body.message.id;
 
-      // Query message with intent
+      // Query message with metadata
       const message = await prismaService.message.findUnique({
         where: { id: messageId },
       });
 
       expect(message).toBeDefined();
-      expect(message!.intent).toBeDefined();
+      expect(message!.metadata).toBeDefined();
 
-      // Validate intent metadata structure (stored as JSON)
-      const intent = message!.intent as any;
-      expect(intent).toHaveProperty('category');
-      expect(intent).toHaveProperty('confidence');
-      expect(intent).toHaveProperty('urgency');
+      // Validate metadata structure (stored as JSON)
+      const metadata = message!.metadata as any;
+      expect(metadata).toHaveProperty('intent');
+      expect(metadata).toHaveProperty('confidence');
     });
-  });
-});
+  });});

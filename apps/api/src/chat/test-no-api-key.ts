@@ -80,8 +80,8 @@ async function main() {
       districtId: 'test-district',
       role: 'parent',
       email: 'test@example.com',
-      displayName: 'Test Parent',
-      childIds: ['student-1'],
+      name: 'Test Parent',
+      childrenIds: ['student-1'],
       schoolIds: ['school-1'],
     },
   });
@@ -89,14 +89,12 @@ async function main() {
   console.log('✅ Response received!\n');
   console.log('📝 Response Details:');
   console.log('   Conversation ID:', result.conversationId);
-  console.log('   Message ID:', result.messageId);
-  console.log('   Response:', result.response);
-  console.log('   Citations:', result.citations.length);
-  console.log('   Follow-ups:', result.suggestedFollowUps);
-  console.log('   Intent:', result.metadata.intentCategory);
-  console.log('   Confidence:', result.metadata.confidence);
-  console.log('   Tools Used:', result.metadata.toolsUsed);
-  console.log('   Processing Time:', result.metadata.processingTimeMs, 'ms');
+  console.log('   Conversation Title:', result.conversationTitle);
+  console.log('   Message ID:', result.message.id);
+  console.log('   Response:', result.response.content);
+  console.log('   Citations:', result.response.citations.length);
+  console.log('   Intent:', result.intent.category);
+  console.log('   Confidence:', result.intent.confidence);
 
   console.log('\n✅ SUCCESS: Chat service works without API keys!');
 }

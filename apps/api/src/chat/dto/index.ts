@@ -93,19 +93,94 @@ export class CitationDto {
     description: 'Title of the source document',
     example: 'Student Handbook 2024-2025',
   })
-  sourceTitle!: string;
+  title!: string;
 
   @ApiPropertyOptional({
-    description: 'Relevant quote from the source',
+    description: 'Relevant excerpt from the source',
     example: 'Students arriving more than 10 minutes late...',
   })
-  quote?: string;
+  excerpt?: string;
+}
 
-  @ApiPropertyOptional({
-    description: 'Page number in source document',
-    example: 15,
+export class IntentDto {
+  @ApiProperty({
+    description: 'Classified intent category',
+    example: 'general',
   })
-  pageNumber?: number;
+  category!: string;
+
+  @ApiProperty({
+    description: 'Confidence score (0-1)',
+    example: 0.85,
+  })
+  confidence!: number;
+
+  @ApiProperty({
+    description: 'Urgency level',
+    example: 'low',
+    enum: ['low', 'medium', 'high', 'critical'],
+  })
+  urgency!: string;
+
+  @ApiProperty({
+    description: 'Whether tools are required',
+    example: false,
+  })
+  requiresTools!: boolean;
+}
+
+export class ToolResultDto {
+  @ApiProperty({
+    description: 'Whether tool execution was successful',
+    example: true,
+  })
+  success!: boolean;
+
+  @ApiProperty({
+    description: 'Tool execution result content',
+    example: 'No tools were executed in this request.',
+  })
+  content!: string;
+
+  @ApiProperty({
+    description: 'Citations from tool execution',
+    type: [CitationDto],
+  })
+  citations!: CitationDto[];
+}
+
+export class GeneratedResponseDto {
+  @ApiProperty({
+    description: 'Generated response content',
+    example: 'According to the policy...',
+  })
+  content!: string;
+
+  @ApiProperty({
+    description: 'Citations supporting the response',
+    type: [CitationDto],
+  })
+  citations!: CitationDto[];
+}
+
+export class MessageDto {
+  @ApiProperty({
+    description: 'Message ID',
+    example: '123e4567-e89b-12d3-a456-426614174001',
+  })
+  id!: string;
+
+  @ApiProperty({
+    description: 'Message content',
+    example: 'What is the school policy?',
+  })
+  content!: string;
+
+  @ApiProperty({
+    description: 'Message role',
+    example: 'USER',
+  })
+  role!: string;
 }
 
 export class MessageMetadataDto {
@@ -135,6 +210,11 @@ export class MessageMetadataDto {
   processingTimeMs!: number;
 }
 
+/**
+ * CANONICAL Response for POST /api/v1/chat/message
+ * 
+ * This is the locked Phase 0 contract. Changes require E2E test updates.
+ */
 export class SendMessageResponseDto {
   @ApiProperty({
     description: 'Conversation ID',
@@ -143,45 +223,34 @@ export class SendMessageResponseDto {
   conversationId!: string;
 
   @ApiProperty({
-    description: 'Message ID',
-    example: '123e4567-e89b-12d3-a456-426614174001',
+    description: 'Conversation title',
+    example: 'Policy Questions',
   })
-  messageId!: string;
+  conversationTitle!: string;
 
   @ApiProperty({
-    description: 'Assistant response content',
-    example:
-      'According to the Student Handbook, students who arrive more than 10 minutes after the bell...',
+    description: 'The user message that was sent',
+    type: MessageDto,
   })
-  response!: string;
+  message!: MessageDto;
 
   @ApiProperty({
-    description: 'Citations supporting the response',
-    type: [CitationDto],
+    description: 'Classified intent',
+    type: IntentDto,
   })
-  citations!: CitationDto[];
+  intent!: IntentDto;
 
   @ApiProperty({
-    description: 'Suggested follow-up questions',
-    example: [
-      'What happens after multiple tardies?',
-      'How can I excuse an absence?',
-    ],
-    type: [String],
+    description: 'Tool execution result',
+    type: ToolResultDto,
   })
-  suggestedFollowUps!: string[];
+  toolResult!: ToolResultDto;
 
   @ApiProperty({
-    description: 'Whether human follow-up has been requested',
-    example: false,
+    description: 'Generated response',
+    type: GeneratedResponseDto,
   })
-  requiresFollowUp!: boolean;
-
-  @ApiProperty({
-    description: 'Processing metadata',
-    type: MessageMetadataDto,
-  })
-  metadata!: MessageMetadataDto;
+  response!: GeneratedResponseDto;
 }
 
 export class ConversationMessageDto {
@@ -222,6 +291,18 @@ export class ConversationDto {
     example: '123e4567-e89b-12d3-a456-426614174000',
   })
   id!: string;
+
+  @ApiPropertyOptional({
+    description: 'Conversation title',
+    example: 'Attendance Policy Questions',
+  })
+  title?: string;
+
+  @ApiProperty({
+    description: 'Conversation status',
+    example: 'ACTIVE',
+  })
+  status!: string;
 
   @ApiProperty({
     description: 'Conversation messages',

@@ -29,7 +29,7 @@ import {
   ApiParam,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { ConversationService } from './conversation.service';
+import { ConversationService, SendMessageInput } from './conversation.service';
 import {
   SendMessageDto,
   SendMessageResponseDto,
@@ -38,8 +38,6 @@ import {
   ConversationDto,
   DeleteConversationResponseDto,
 } from './dto';
-import { SendMessageInput } from './conversation.service';
-import { UserContext } from '@schoolos/ai';
 
 // ============================================================
 // REQUEST WITH USER
@@ -98,21 +96,21 @@ export class ChatController {
     @Body() dto: SendMessageDto,
     @Request() req: AuthenticatedRequest,
   ): Promise<SendMessageResponseDto> {
-    const userContext: UserContext = {
+    const userContext = {
       userId: req.user.id,
       districtId: req.user.districtId,
-      role: req.user.role as UserContext['role'],
-      schoolIds: req.user.schoolIds ?? (req.user.schoolId ? [req.user.schoolId] : undefined),
+      role: req.user.role,
+      schoolIds: req.user.schoolIds ?? (req.user.schoolId ? [req.user.schoolId] : []),
       email: req.user.email,
-      displayName: req.user.displayName ?? req.user.id,
-      childIds: req.user.childIds,
+      name: req.user.displayName ?? req.user.id,
+      childrenIds: req.user.childIds,
       permissions: req.user.permissions,
     };
 
     try {
       const payload: SendMessageInput = {
         message: dto.message,
-        userContext,
+        userContext: userContext as any,
         ...(dto.metadata ? { metadata: dto.metadata } : {}),
       };
 
@@ -205,11 +203,14 @@ export class ChatController {
 
     return {
       id: conversation.id,
+      title: conversation.title || 'New Conversation',
+      status: conversation.status || 'ACTIVE',
       messages: conversation.messages.map((m) => ({
         id: m.id ?? '',
-        role: m.role,
+        role: m.role.toUpperCase() as 'user' | 'assistant' | 'system',
         content: m.content,
         timestamp: m.timestamp,
+        createdAt: m.timestamp, // Alias for backward compatibility
         ...(m.metadata ? { metadata: m.metadata } : {}),
       })),
       createdAt: conversation.createdAt,

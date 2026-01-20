@@ -35,7 +35,7 @@
   },
   "scripts": {
     "build": "tsup src/index.ts src/intent/index.ts src/tools/index.ts src/orchestration/index.ts src/safety/index.ts --format cjs,esm --clean && npm run build:types-stub",
-    "build:types-stub": "mkdir -p dist/intent dist/tools dist/orchestration dist/safety && printf \"export {}\\n\" > dist/index.d.ts && printf \"export {}\\n\" > dist/intent/index.d.ts && printf \"export {}\\n\" > dist/tools/index.d.ts && printf \"export {}\\n\" > dist/orchestration/index.d.ts && printf \"export {}\\n\" > dist/safety/index.d.ts",
+    "build:types-stub": "mkdir -p dist/intent dist/tools dist/orchestration dist/safety && printf \"export {}\n\" > dist/index.d.ts && printf \"export {}\n\" > dist/intent/index.d.ts && printf \"export {}\n\" > dist/tools/index.d.ts && printf \"export {}\n\" > dist/orchestration/index.d.ts && printf \"export {}\n\" > dist/safety/index.d.ts",
     "dev": "tsup src/index.ts src/intent/index.ts src/tools/index.ts src/orchestration/index.ts src/safety/index.ts --format cjs,esm --watch --clean",
     "lint": "eslint src/**/*.ts --fix",
     "typecheck": "tsc --noEmit",

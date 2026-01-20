@@ -20,17 +20,121 @@ import {
   CalendarQueryTool,
   StudentDataFetchTool,
   EscalationTool,
-  ClassifiedIntent,
-  UserContext,
-  ConversationContext,
-  ConversationMessage,
-  IntentCategory,
-  SafetyCheckResult,
-  ToolResult,
-  GeneratedResponse,
 } from '@schoolos/ai';
 import { HybridSearchService } from '../knowledge/search/hybrid-search.service';
 import { $Enums } from '@prisma/client';
+
+// ============================================================
+// LOCAL TYPE DEFINITIONS
+// (Matches @schoolos/ai types - workaround for stub .d.ts files)
+// ============================================================
+
+/** User context for AI operations */
+interface LocalUserContext {
+  userId: string;
+  districtId: string;
+  role: string;
+  email?: string;
+  name?: string;
+  displayName?: string;
+  schoolIds?: string[];
+  childrenIds?: string[];
+  permissions?: string[];
+}
+
+/** Conversation message for context */
+interface LocalConversationMessage {
+  id?: string;
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  timestamp: Date;
+  metadata?: Record<string, unknown>;
+}
+
+/** Full conversation context */
+interface LocalConversationContext {
+  conversationId?: string;
+  conversationHistory: LocalConversationMessage[];
+  activeChildId?: string;
+  conversationSummary?: string;
+  topics?: string[];
+  user: LocalUserContext;
+  districtConfig?: Record<string, unknown>;
+  // Additional fields expected by tool-router/response-generator
+  recentTopics?: string[];
+  pendingQuestion?: string;
+  messageCount?: number;
+  lastInteractionTime?: Date;
+}
+
+/** Classified intent result */
+interface LocalClassifiedIntent {
+  category: string;
+  secondaryCategory?: string;
+  confidence: number;
+  urgency?: 'low' | 'medium' | 'high';
+  entities?: Record<string, unknown>;
+  requiresTools?: boolean;
+  requiresStudentContext?: boolean;
+  shouldEscalate?: boolean;
+  reasoning?: string;
+  originalQuery?: string;
+  classifiedAt?: Date;
+}
+
+/** Safety check result */
+interface LocalSafetyCheckResult {
+  passed: boolean;
+  violations?: Array<{
+    type: string;
+    message: string;
+    severity: string;
+  }>;
+  sanitizedContent?: string;
+}
+
+/** Tool execution result */
+interface LocalToolResult {
+  toolName: string;
+  success: boolean;
+  content?: string;
+  data?: Record<string, unknown>;
+  error?: string;
+  metadata?: Record<string, unknown>;
+}
+
+/** Generated response */
+interface LocalGeneratedResponse {
+  content: string;
+  citations?: Array<{
+    sourceId: string;
+    sourceTitle?: string;
+    title?: string;
+    quote?: string;
+    excerpt?: string;
+  }>;
+}
+
+/** Intent categories */
+const LocalIntentCategory = {
+  GREETING: 'greeting',
+  OUT_OF_SCOPE: 'out_of_scope',
+  SCHEDULE: 'schedule',
+  GRADES: 'grades',
+  ATTENDANCE: 'attendance',
+  POLICY: 'policy',
+  GENERAL: 'general',
+} as const;
+
+// Re-export as the original names for use in the service
+type UserContext = LocalUserContext;
+type ConversationMessage = LocalConversationMessage;
+type ConversationContext = LocalConversationContext;
+type ClassifiedIntent = LocalClassifiedIntent;
+type SafetyCheckResult = LocalSafetyCheckResult;
+type ToolResult = LocalToolResult;
+type GeneratedResponse = LocalGeneratedResponse;
+const IntentCategory = LocalIntentCategory;
 
 // ============================================================
 // TYPES
@@ -50,36 +154,59 @@ export interface SendMessageInput {
   metadata?: Record<string, unknown>;
 }
 
+/** Citation in the API response */
+interface ResponseCitation {
+  sourceId: string;
+  title: string;
+  excerpt?: string;
+}
+
+/** Intent information in the API response */
+interface ResponseIntent {
+  category: string;
+  confidence: number;
+  urgency: string;
+  requiresTools: boolean;
+}
+
+/** Message information in the API response */
+interface ResponseMessage {
+  id: string;
+  content: string;
+  role: string;
+}
+
+/** Tool result in the API response */
+interface ResponseToolResult {
+  success: boolean;
+  content: string;
+  citations: ResponseCitation[];
+}
+
+/** Generated response in the API response */
+interface ResponseContent {
+  content: string;
+  citations: ResponseCitation[];
+}
+
 export interface ConversationServiceResponse {
   /** Conversation ID */
   conversationId: string;
 
-  /** Message ID */
-  messageId: string;
+  /** Conversation title */
+  conversationTitle: string;
 
-  /** Assistant response content */
-  response: string;
+  /** User message information */
+  message: ResponseMessage;
 
-  /** Citations if any */
-  citations: Array<{
-    sourceId: string;
-    sourceTitle: string;
-    quote?: string;
-  }>;
+  /** Intent classification result */
+  intent: ResponseIntent;
 
-  /** Suggested follow-up questions */
-  suggestedFollowUps: string[];
+  /** Tool execution result */
+  toolResult: ResponseToolResult;
 
-  /** Whether human follow-up is pending */
-  requiresFollowUp: boolean;
-
-  /** Processing metadata */
-  metadata: {
-    intentCategory: string;
-    confidence: number;
-    toolsUsed: string[];
-    processingTimeMs: number;
-  };
+  /** Generated response */
+  response: ResponseContent;
 }
 
 // ============================================================
@@ -136,8 +263,7 @@ class MockEscalationService {
 class StubIntentClassifier {
   async classify(
     _message: string,
-    _userContext: UserContext,
-    _conversationContext: ConversationContext,
+    _context: ConversationContext,
   ): Promise<ClassifiedIntent> {
     return {
       category: 'general',
@@ -196,7 +322,7 @@ class StubSafetyGuardrails {
     return {
       passed: true,
       violations: [],
-      sanitizedContent: undefined,
+      sanitizedContent: '',
     };
   }
 
@@ -204,7 +330,7 @@ class StubSafetyGuardrails {
     return {
       passed: true,
       violations: [],
-      sanitizedContent: undefined,
+      sanitizedContent: '',
     };
   }
 }
@@ -304,7 +430,6 @@ export class ConversationService implements OnModuleInit {
    * Process a user message and generate a response
    */
   async sendMessage(input: SendMessageInput): Promise<ConversationServiceResponse> {
-    const startTime = Date.now();
     const { conversationId, message, userContext, metadata } = input;
 
     // 1. Safety check on input
@@ -314,11 +439,11 @@ export class ConversationService implements OnModuleInit {
 
       // For severe violations, reject the message
       if (
-        inputSafetyCheck.violations.some(
-          (v: SafetyCheckResult['violations'][number]) => v.severity === 'HIGH',
+        inputSafetyCheck.violations?.some(
+          (v: any) => v.severity === 'HIGH',
         )
       ) {
-        return this.createSafetyErrorResponse(conversationId || '', inputSafetyCheck);
+        return this.createSafetyErrorResponse(conversationId || '', inputSafetyCheck as any);
       }
     }
 
@@ -342,7 +467,7 @@ export class ConversationService implements OnModuleInit {
     // 6. Classify intent
     const intent = await this.intentClassifier.classify(
       message,
-      fullConversationContext,
+      fullConversationContext as any,
     );
 
     this.logger.debug('Intent classified', {
@@ -351,29 +476,57 @@ export class ConversationService implements OnModuleInit {
       urgency: intent['urgency'],
     });
 
+    // 6b. Update user message with intent metadata
+    await this.prisma.message.update({
+      where: { id: userMessage.id },
+      data: {
+        metadata: {
+          ...(metadata || {}),
+          intent: intent.category,
+          confidence: intent.confidence,
+          urgency: (intent as any).urgency || 'low',
+          requiresTools: (intent as any).requiresTools || false,
+        } as any,
+      },
+    });
+
     // 7. Handle special cases (greetings, simple queries)
-    if (this.isSimpleIntent(intent)) {
-      const simpleResponse = await this.handleSimpleIntent(intent, userContext, fullConversationContext);
+    if (this.isSimpleIntent(intent as any)) {
+      const simpleResponse = await this.handleSimpleIntent(intent as any, userContext, fullConversationContext);
       await this.saveMessage(conversation.id, 'assistant', simpleResponse.response, {
         intent: intent.category,
         confidence: intent.confidence,
       });
 
+      // Return canonical response format
       return {
         conversationId: conversation.id,
-        messageId: userMessage.id,
-        ...simpleResponse,
-        metadata: {
-          intentCategory: intent.category,
+        conversationTitle: conversation.title || 'New Conversation',
+        message: {
+          id: userMessage.id,
+          content: message,
+          role: 'USER',
+        },
+        intent: {
+          category: intent.category,
           confidence: intent.confidence,
-          toolsUsed: [],
-          processingTimeMs: Date.now() - startTime,
+          urgency: (intent as any).urgency || 'low',
+          requiresTools: (intent as any).requiresTools || false,
+        },
+        toolResult: {
+          success: true,
+          content: 'No tools were executed for this request.',
+          citations: [],
+        },
+        response: {
+          content: simpleResponse.response,
+          citations: [],
         },
       };
     }
 
     // 8. Route to appropriate tools
-    const routing = await this.toolRouter.route(intent, userContext, fullConversationContext);
+    const routing = await this.toolRouter.route(intent as any, userContext as any, fullConversationContext as any);
 
     this.logger.debug('Routing determined', {
       tools: routing.selectedTools.map((t: { toolName: string }) => t.toolName),
@@ -383,25 +536,25 @@ export class ConversationService implements OnModuleInit {
     // 9. Execute tools
     const executionResult = await this.toolRouter.execute(
       routing,
-      intent,
-      userContext,
-      conversationHistory,
+      intent as any,
+      userContext as any,
+      conversationHistory as any,
     );
 
     // 10. Generate response
     const generatedResponse = await this.responseGenerator.generate({
-      intent,
+      intent: intent as any,
       executionResult,
-      userContext,
-      conversationContext: fullConversationContext,
-      conversationHistory,
+      userContext: userContext as any,
+      conversationContext: fullConversationContext as any,
+      conversationHistory: conversationHistory as any,
     });
 
     // 11. Safety check on output
     const outputSafetyCheck = await this.safetyGuardrails.checkOutput(
-      generatedResponse,
-      userContext,
-      intent,
+      generatedResponse as any,
+      userContext as any,
+      intent as any,
     );
 
     const finalContent = outputSafetyCheck.passed
@@ -425,22 +578,38 @@ export class ConversationService implements OnModuleInit {
       requiresFollowUp: executionResult.requiresFollowUp,
     });
 
+    // Transform citations to canonical format
+    const citations = (generatedResponse.citations || []).map((c: any) => ({
+      sourceId: c.sourceId || c.id || 'unknown',
+      title: c.sourceTitle || c.title || 'Unknown Source',
+      excerpt: c.quote || c.excerpt || undefined,
+    }));
+
+    // Return canonical response format
     return {
       conversationId: conversation.id,
-      messageId: userMessage.id,
-      response: finalContent,
-      citations: (generatedResponse.citations as Array<{
-        sourceId: string;
-        sourceTitle: string;
-        quote?: string;
-      }> | undefined) ?? [],
-      suggestedFollowUps: generatedResponse.suggestedFollowUps,
-      requiresFollowUp: executionResult.requiresFollowUp ?? false,
-      metadata: {
-        intentCategory: intent.category,
-        confidence: generatedResponse.confidence,
-        toolsUsed: executionResult.toolResults.map((r: any) => r.metadata?.toolName || 'unknown'),
-        processingTimeMs: Date.now() - startTime,
+      conversationTitle: conversation.title || 'New Conversation',
+      message: {
+        id: userMessage.id,
+        content: message,
+        role: 'USER',
+      },
+      intent: {
+        category: intent.category,
+        confidence: intent.confidence,
+        urgency: (intent as any).urgency || 'low',
+        requiresTools: (intent as any).requiresTools || false,
+      },
+      toolResult: {
+        success: true,
+        content: executionResult.toolResults.length > 0 
+          ? executionResult.toolResults.map((r: any) => r.content || '').join('\n')
+          : 'No tools were executed for this request.',
+        citations: citations,
+      },
+      response: {
+        content: finalContent,
+        citations: citations,
       },
     };
   }
@@ -453,6 +622,8 @@ export class ConversationService implements OnModuleInit {
     userId: string,
   ): Promise<{
     id: string;
+    title?: string;
+    status?: string;
     messages: ConversationMessage[];
     createdAt: Date;
     updatedAt: Date;
@@ -475,6 +646,8 @@ export class ConversationService implements OnModuleInit {
 
     return {
       id: conversation.id,
+      ...(conversation.title ? { title: conversation.title } : {}),
+      status: String(conversation.status || 'ACTIVE'),
       messages: conversation.messages.map(
         (m): ConversationMessage => ({
           id: m.id,
@@ -612,7 +785,7 @@ export class ConversationService implements OnModuleInit {
     conversationId: string,
     role: 'user' | 'assistant' | 'system',
     content: string,
-    _metadata?: Record<string, unknown>,
+    metadata?: Record<string, unknown>,
   ) {
     const prismaRole = role.toUpperCase() as $Enums.MessageRole;
 
@@ -621,6 +794,7 @@ export class ConversationService implements OnModuleInit {
         conversationId,
         role: prismaRole,
         content,
+        metadata: (metadata || {}) as any,
       },
     });
   }
@@ -685,19 +859,10 @@ export class ConversationService implements OnModuleInit {
     intent: ClassifiedIntent,
     userContext: UserContext,
     _conversationContext?: ConversationContext,
-  ): Promise<Omit<ConversationServiceResponse, 'conversationId' | 'messageId' | 'metadata'>> {
+  ): Promise<{ response: string }> {
     if (intent.category === IntentCategory.GREETING) {
       const greeting = this.getGreetingResponse(userContext);
-      return {
-        response: greeting,
-        citations: [],
-        suggestedFollowUps: [
-          'What events are coming up this week?',
-          'How is my child doing in school?',
-          'What are the school policies on attendance?',
-        ],
-        requiresFollowUp: false,
-      };
+      return { response: greeting };
     }
 
     // Out of scope
@@ -705,13 +870,6 @@ export class ConversationService implements OnModuleInit {
       response:
         "I'm here to help with school-related questions like schedules, grades, attendance, and policies. " +
         'Is there something specific about school I can help you with?',
-      citations: [],
-      suggestedFollowUps: [
-        'Tell me about upcoming school events',
-        'What are the grading policies?',
-        'How do I contact my child\'s teacher?',
-      ],
-      requiresFollowUp: false,
     };
   }
 
@@ -731,20 +889,32 @@ export class ConversationService implements OnModuleInit {
     conversationId: string,
     _safetyCheck: SafetyCheckResult,
   ): ConversationServiceResponse {
+    const errorMessage = 
+      "I'm not able to process that request. Please rephrase your question, " +
+      'or contact the school office if you need immediate assistance.';
+    
     return {
       conversationId,
-      messageId: '',
-      response:
-        "I'm not able to process that request. Please rephrase your question, " +
-        'or contact the school office if you need immediate assistance.',
-      citations: [],
-      suggestedFollowUps: [],
-      requiresFollowUp: false,
-      metadata: {
-        intentCategory: 'SAFETY_BLOCKED',
+      conversationTitle: 'Safety Alert',
+      message: {
+        id: '',
+        content: '',
+        role: 'USER',
+      },
+      intent: {
+        category: 'SAFETY_BLOCKED',
         confidence: 0,
-        toolsUsed: [],
-        processingTimeMs: 0,
+        urgency: 'high',
+        requiresTools: false,
+      },
+      toolResult: {
+        success: false,
+        content: 'Message blocked by safety filter.',
+        citations: [],
+      },
+      response: {
+        content: errorMessage,
+        citations: [],
       },
     };
   }
