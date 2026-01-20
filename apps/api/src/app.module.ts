@@ -11,6 +11,7 @@ import { DatabaseModule } from './database/database.module';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { RelationshipsModule } from './relationships/relationships.module';
+import { ChatModule } from './chat/chat.module';
 import { HealthModule } from './health/health.module';
 import { KnowledgeModule } from './knowledge/knowledge.module';
 import { IntegrationsModule } from './integrations/integrations.module';
@@ -51,6 +52,7 @@ import { envValidationSchema } from './config/env.validation';
     AuthModule,
     UsersModule,
     RelationshipsModule,
+    ChatModule,
     HealthModule,
     KnowledgeModule,
     IntegrationsModule,

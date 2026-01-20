@@ -7,7 +7,7 @@
  * @module @schoolos/ai/orchestration
  */
 
-import Anthropic from '@anthropic-ai/sdk';
+import OpenAI from 'openai';
 import { z } from 'zod';
 import {
   ClassifiedIntent,
@@ -28,8 +28,8 @@ import { BaseTool, ToolRegistry } from '../tools/base-tool';
 // ============================================================
 
 export interface ToolRouterConfig {
-  /** Anthropic API key */
-  anthropicApiKey: string;
+  /** OpenAI API key */
+  openaiApiKey: string;
 
   /** Model to use for tool selection reasoning */
   model?: string;
@@ -102,7 +102,7 @@ const ToolSelectionResponseSchema = z.object({
 // ============================================================
 
 export class ToolRouter {
-  private readonly client: Anthropic;
+  private readonly client: OpenAI;
   private readonly model: string;
   private readonly maxToolsPerRequest: number;
   private readonly enableParallelExecution: boolean;
@@ -112,8 +112,8 @@ export class ToolRouter {
     private readonly registry: ToolRegistry,
     config: ToolRouterConfig,
   ) {
-    this.client = new Anthropic({ apiKey: config.anthropicApiKey });
-    this.model = config.model || 'claude-sonnet-4-20250514';
+    this.client = new OpenAI({ apiKey: config.openaiApiKey });
+    this.model = config.model || 'gpt-4.1-mini';
     this.maxToolsPerRequest = config.maxToolsPerRequest || 3;
     this.enableParallelExecution = config.enableParallelExecution ?? true;
     this.executionTimeoutMs = config.executionTimeoutMs || 30000;
@@ -352,20 +352,23 @@ ${conversationContext ? `Recent conversation topic: ${conversationContext.recent
 Select the appropriate tool(s) and provide reasoning. Respond with JSON only.`;
 
     try {
-      const response = await this.client.messages.create({
+      const response = await this.client.chat.completions.create({
         model: this.model,
         max_tokens: 1024,
-        system: systemPrompt,
-        messages: [{ role: 'user', content: userPrompt }],
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        response_format: { type: 'json_object' },
       });
 
-      const content = response.content[0];
-      if (content.type !== 'text') {
-        throw new Error('Unexpected response type from Claude');
+      const content = response.choices[0]?.message?.content;
+      if (!content) {
+        throw new Error('No content in response from OpenAI');
       }
 
       // Parse and validate response
-      const parsed = this.parseToolSelectionResponse(content.text);
+      const parsed = this.parseToolSelectionResponse(content);
 
       return {
         selectedTools: parsed.selectedTools

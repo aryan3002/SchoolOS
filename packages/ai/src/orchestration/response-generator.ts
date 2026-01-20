@@ -7,7 +7,7 @@
  * @module @schoolos/ai/orchestration
  */
 
-import Anthropic from '@anthropic-ai/sdk';
+import OpenAI from 'openai';
 import { z } from 'zod';
 import {
   ClassifiedIntent,
@@ -26,8 +26,8 @@ import { ExecutionResult } from './tool-router';
 // ============================================================
 
 export interface ResponseGeneratorConfig {
-  /** Anthropic API key */
-  anthropicApiKey: string;
+  /** OpenAI API key */
+  openaiApiKey: string;
 
   /** Model to use for response generation */
   model?: string;
@@ -90,15 +90,15 @@ const ResponseStructureSchema = z.object({
 // ============================================================
 
 export class ResponseGenerator {
-  private readonly client: Anthropic;
+  private readonly client: OpenAI;
   private readonly model: string;
   private readonly maxResponseTokens: number;
   private readonly includeSuggestedFollowUps: boolean;
   private readonly districtBranding?: ResponseGeneratorConfig['districtBranding'];
 
   constructor(config: ResponseGeneratorConfig) {
-    this.client = new Anthropic({ apiKey: config.anthropicApiKey });
-    this.model = config.model || 'claude-sonnet-4-20250514';
+    this.client = new OpenAI({ apiKey: config.openaiApiKey });
+    this.model = config.model || 'gpt-4.1';
     this.maxResponseTokens = config.maxResponseTokens || 1024;
     this.includeSuggestedFollowUps = config.includeSuggestedFollowUps ?? true;
     this.districtBranding = config.districtBranding;
@@ -123,19 +123,21 @@ export class ResponseGenerator {
     const userPrompt = this.buildUserPrompt(intent, executionResult, conversationHistory);
 
     try {
-      const response = await this.client.messages.create({
+      const response = await this.client.chat.completions.create({
         model: this.model,
         max_tokens: this.maxResponseTokens,
-        system: systemPrompt,
-        messages: [{ role: 'user', content: userPrompt }],
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
       });
 
-      const content = response.content[0];
-      if (content.type !== 'text') {
-        throw new Error('Unexpected response type');
+      const content = response.choices[0]?.message?.content;
+      if (!content) {
+        throw new Error('No content in response');
       }
 
-      return this.parseAndFormatResponse(content.text, executionResult, intent);
+      return this.parseAndFormatResponse(content, executionResult, intent);
     } catch (error) {
       console.error('Response generation failed:', error);
       return this.generateFallbackResponse(intent, executionResult, userContext);

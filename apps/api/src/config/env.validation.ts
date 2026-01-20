@@ -13,7 +13,10 @@ export const envValidationSchema = Joi.object({
   JWT_REFRESH_EXPIRY: Joi.string().default('7d'),
   CORS_ORIGINS: Joi.string().default('http://localhost:3000'),
   REDIS_URL: Joi.string().allow('', null),
-  ANTHROPIC_API_KEY: Joi.string().allow('', null),
+  // OpenAI Configuration
+  OPENAI_API_KEY: Joi.string().allow('', null),
+  DEFAULT_INTENT_MODEL: Joi.string().default('gpt-4.1-mini'),
+  DEFAULT_RESPONSE_MODEL: Joi.string().default('gpt-4.1'),
   GOOGLE_CALENDAR_CLIENT_EMAIL: Joi.string().allow('', null),
   GOOGLE_CALENDAR_PRIVATE_KEY: Joi.string().allow('', null),
 });

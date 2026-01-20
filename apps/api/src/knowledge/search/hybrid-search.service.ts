@@ -29,7 +29,7 @@ import {
 export class HybridSearchService {
   private readonly logger = new Logger(HybridSearchService.name);
   private readonly rerankingEnabled: boolean;
-  private readonly anthropicApiKey: string;
+  private readonly openaiApiKey: string;
   private readonly defaultVectorWeight: number;
   private readonly defaultLimit: number;
   private readonly rrfK: number; // Reciprocal Rank Fusion constant
@@ -39,8 +39,8 @@ export class HybridSearchService {
     private readonly configService: ConfigService,
     private readonly embeddingService: EmbeddingService,
   ) {
-    this.anthropicApiKey = this.configService.get<string>('ANTHROPIC_API_KEY') || '';
-    this.rerankingEnabled = !!this.anthropicApiKey;
+    this.openaiApiKey = this.configService.get<string>('OPENAI_API_KEY') || '';
+    this.rerankingEnabled = !!this.openaiApiKey;
     this.defaultVectorWeight = this.configService.get<number>('SEARCH_VECTOR_WEIGHT') || 0.7;
     this.defaultLimit = this.configService.get<number>('SEARCH_DEFAULT_LIMIT') || 10;
     this.rrfK = this.configService.get<number>('SEARCH_RRF_K') || 60;
@@ -369,10 +369,10 @@ export class HybridSearchService {
   }
 
   /**
-   * Rerank results using Claude API
+   * Rerank results using OpenAI API
    */
   private async rerankWithClaude(query: string, results: HybridSearchResult[]): Promise<HybridSearchResult[]> {
-    if (!this.anthropicApiKey || results.length === 0) {
+    if (!this.openaiApiKey || results.length === 0) {
       return results;
     }
 
@@ -393,16 +393,15 @@ ${documents}
 
 Respond with ONLY a JSON array of scores in order, like: [8, 5, 9, 3, ...]`;
 
-      // Call Claude API
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
+      // Call OpenAI API
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-api-key': this.anthropicApiKey,
-          'anthropic-version': '2023-06-01',
+          'Authorization': `Bearer ${this.openaiApiKey}`,
         },
         body: JSON.stringify({
-          model: 'claude-3-haiku-20240307', // Use fast model for reranking
+          model: 'gpt-4.1-mini', // Use fast model for reranking
           max_tokens: 200,
           messages: [
             {
@@ -410,18 +409,19 @@ Respond with ONLY a JSON array of scores in order, like: [8, 5, 9, 3, ...]`;
               content: prompt,
             },
           ],
+          response_format: { type: 'json_object' },
         }),
       });
 
       if (!response.ok) {
-        this.logger.warn('Claude reranking failed', { status: response.status });
+        this.logger.warn('OpenAI reranking failed', { status: response.status });
         return results;
       }
 
       const data = (await response.json()) as {
-        content?: Array<{ text?: string }>;
+        choices?: Array<{ message?: { content?: string } }>;
       };
-      const content = data.content?.[0]?.text ?? '';
+      const content = data.choices?.[0]?.message?.content ?? '';
 
       // Parse scores from response
       const scoreMatch = content.match(/\[[\d,\s.]+\]/);

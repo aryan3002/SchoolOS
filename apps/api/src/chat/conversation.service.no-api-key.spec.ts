@@ -52,7 +52,7 @@ describe('ConversationService (No API Key)', () => {
 
     const mockConfigService = {
       get: jest.fn().mockImplementation((key: string) => {
-        if (key === 'ANTHROPIC_API_KEY') {
+        if (key === 'OPENAI_API_KEY') {
           return undefined; // Simulate no API key
         }
         return undefined;
@@ -86,7 +86,7 @@ describe('ConversationService (No API Key)', () => {
 
   it('should initialize with stub components when no API key is present', () => {
     // Verify that the configService was called
-    expect(configService.get).toHaveBeenCalledWith('ANTHROPIC_API_KEY');
+    expect(configService.get).toHaveBeenCalledWith('OPENAI_API_KEY');
   });
 
   it('should handle chat request without API key and return valid response', async () => {

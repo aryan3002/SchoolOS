@@ -237,18 +237,18 @@ export class ConversationService implements OnModuleInit {
    * Initialize all AI components
    */
   private async initializeComponents() {
-    const anthropicApiKey = this.configService.get<string>('ANTHROPIC_API_KEY');
+    const openaiApiKey = this.configService.get<string>('OPENAI_API_KEY');
 
-    if (!anthropicApiKey) {
-      this.logger.warn('ANTHROPIC_API_KEY not configured - using stub AI implementations');
+    if (!openaiApiKey) {
+      this.logger.warn('OPENAI_API_KEY not configured - using stub AI implementations');
       this.initializeStubComponents();
       return;
     }
 
     // Initialize Intent Classifier
     this.intentClassifier = new IntentClassifier({
-      anthropicApiKey,
-      model: 'claude-sonnet-4-20250514',
+      apiKey: openaiApiKey,
+      model: 'gpt-4.1-mini',
     });
 
     // Initialize Tool Registry and Tools
@@ -268,13 +268,13 @@ export class ConversationService implements OnModuleInit {
 
     // Initialize Tool Router
     this.toolRouter = new ToolRouter(this.toolRegistry, {
-      anthropicApiKey,
+      openaiApiKey,
       enableParallelExecution: true,
     });
 
     // Initialize Response Generator
     this.responseGenerator = new ResponseGenerator({
-      anthropicApiKey,
+      openaiApiKey,
       includeSuggestedFollowUps: true,
     });
 
@@ -331,14 +331,18 @@ export class ConversationService implements OnModuleInit {
     // 4. Load conversation history
     const conversationHistory = await this.loadConversationHistory(conversation.id);
 
-    // 5. Build conversation context
-    const conversationContext = this.buildConversationContext(conversationHistory);
+    // 5. Build conversation context for intent classification
+    const fullConversationContext: ConversationContext = {
+      conversationHistory,
+      user: userContext,
+      // Include any topics from the mini context
+      topics: this.buildConversationContext(conversationHistory).recentTopics,
+    };
 
     // 6. Classify intent
     const intent = await this.intentClassifier.classify(
       message,
-      userContext,
-      conversationContext,
+      fullConversationContext,
     );
 
     this.logger.debug('Intent classified', {
@@ -349,7 +353,7 @@ export class ConversationService implements OnModuleInit {
 
     // 7. Handle special cases (greetings, simple queries)
     if (this.isSimpleIntent(intent)) {
-      const simpleResponse = await this.handleSimpleIntent(intent, userContext, conversationContext);
+      const simpleResponse = await this.handleSimpleIntent(intent, userContext, fullConversationContext);
       await this.saveMessage(conversation.id, 'assistant', simpleResponse.response, {
         intent: intent.category,
         confidence: intent.confidence,
@@ -369,7 +373,7 @@ export class ConversationService implements OnModuleInit {
     }
 
     // 8. Route to appropriate tools
-    const routing = await this.toolRouter.route(intent, userContext, conversationContext);
+    const routing = await this.toolRouter.route(intent, userContext, fullConversationContext);
 
     this.logger.debug('Routing determined', {
       tools: routing.selectedTools.map((t: { toolName: string }) => t.toolName),
@@ -389,7 +393,7 @@ export class ConversationService implements OnModuleInit {
       intent,
       executionResult,
       userContext,
-      conversationContext,
+      conversationContext: fullConversationContext,
       conversationHistory,
     });
 
@@ -577,7 +581,7 @@ export class ConversationService implements OnModuleInit {
     conversationId: string | undefined,
     userContext: UserContext,
   ) {
-    if (conversationId) {
+    if (conversationId && conversationId.trim().length > 0) {
       const existing = await this.prisma.conversation.findFirst({
         where: {
           id: conversationId,
@@ -642,7 +646,12 @@ export class ConversationService implements OnModuleInit {
     }));
   }
 
-  private buildConversationContext(messages: ConversationMessage[]): ConversationContext {
+  private buildConversationContext(messages: ConversationMessage[]): {
+    recentTopics: string[];
+    pendingQuestion: boolean;
+    messageCount: number;
+    lastInteractionTime: Date;
+  } {
     // Extract recent topics from message content
     const recentTopics: string[] = [];
     const lastFewMessages = messages.slice(-5);

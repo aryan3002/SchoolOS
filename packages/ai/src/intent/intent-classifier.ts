@@ -1,7 +1,7 @@
 /**
  * Intent Classifier
  *
- * Production-grade intent classification using Claude for SchoolOS.
+ * Production-grade intent classification using OpenAI GPT for SchoolOS.
  * Analyzes user messages and classifies them into actionable intents
  * with extracted entities, confidence scores, and urgency levels.
  *
@@ -15,7 +15,7 @@
  * @module @schoolos/ai/intent
  */
 
-import Anthropic from '@anthropic-ai/sdk';
+import OpenAI from 'openai';
 import { z } from 'zod';
 
 import {
@@ -29,7 +29,7 @@ import {
 // ============================================================
 
 export interface IntentClassifierConfig {
-  /** Anthropic API key */
+  /** OpenAI API key */
   apiKey: string;
 
   /** Model to use for classification */
@@ -49,7 +49,7 @@ export interface IntentClassifierConfig {
 }
 
 const DEFAULT_CONFIG: Required<Omit<IntentClassifierConfig, 'apiKey'>> = {
-  model: 'claude-sonnet-4-20250514',
+  model: 'gpt-4.1-mini',
   maxTokens: 1000,
   temperature: 0.1, // Low temperature for consistent classification
   escalationThreshold: 0.6,
@@ -101,12 +101,12 @@ type ClassificationResponse = z.infer<typeof ClassificationResponseSchema>;
 // ============================================================
 
 export class IntentClassifier {
-  private readonly client: Anthropic;
+  private readonly client: OpenAI;
   private readonly config: Required<Omit<IntentClassifierConfig, 'apiKey'>> & { apiKey: string };
 
   constructor(config: IntentClassifierConfig) {
     this.config = { ...DEFAULT_CONFIG, ...config };
-    this.client = new Anthropic({ apiKey: this.config.apiKey });
+    this.client = new OpenAI({ apiKey: this.config.apiKey });
   }
 
   /**
@@ -123,22 +123,23 @@ export class IntentClassifier {
       // Build the classification prompt
       const prompt = this.buildClassificationPrompt(message, context);
 
-      // Call Claude for classification
-      const response = await this.client.messages.create({
+      // Call OpenAI for classification
+      const response = await this.client.chat.completions.create({
         model: this.config.model,
         max_tokens: this.config.maxTokens,
         temperature: this.config.temperature,
         messages: [{ role: 'user', content: prompt }],
+        response_format: { type: 'json_object' },
       });
 
       // Extract text content from response
-      const textContent = response.content.find((c) => c.type === 'text');
-      if (!textContent || textContent.type !== 'text') {
-        throw new Error('No text content in classification response');
+      const content = response.choices[0]?.message?.content;
+      if (!content) {
+        throw new Error('No content in classification response');
       }
 
       // Parse and validate the response
-      const classification = this.parseClassificationResponse(textContent.text);
+      const classification = this.parseClassificationResponse(content);
 
       // Apply escalation rules
       const shouldEscalate = this.shouldEscalate(classification, context);

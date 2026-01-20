@@ -7,11 +7,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { IntentClassifier, IntentCategory, UrgencyLevel, UserContext } from '@schoolos/ai';
 
-// Mock Anthropic client
-vi.mock('@anthropic-ai/sdk', () => ({
+// Mock OpenAI client
+vi.mock('openai', () => ({
   default: vi.fn().mockImplementation(() => ({
-    messages: {
-      create: vi.fn(),
+    chat: {
+      completions: {
+        create: vi.fn(),
+      },
     },
   })),
 }));
@@ -29,32 +31,33 @@ describe('IntentClassifier', () => {
 
   beforeEach(() => {
     classifier = new IntentClassifier({
-      anthropicApiKey: 'test-api-key',
-      model: 'claude-sonnet-4-20250514',
+      apiKey: 'test-api-key',
+      model: 'gpt-4.1-mini',
     });
 
     // Access the mock
-    const Anthropic = require('@anthropic-ai/sdk').default;
-    mockCreate = Anthropic.mock.results[0].value.messages.create;
+    const OpenAI = require('openai').default;
+    mockCreate = OpenAI.mock.results[0].value.chat.completions.create;
   });
 
   describe('classify', () => {
     it('should classify calendar queries correctly', async () => {
       mockCreate.mockResolvedValueOnce({
-        content: [
+        choices: [
           {
-            type: 'text',
-            text: JSON.stringify({
-              category: 'CALENDAR_QUERY',
-              confidence: 0.92,
-              urgencyLevel: 'LOW',
-              entities: {
-                dateReferences: ['next week'],
-                eventTypes: ['general'],
-              },
-              reasoning: 'User asking about upcoming events',
-              shouldEscalate: false,
-            }),
+            message: {
+              content: JSON.stringify({
+                category: 'CALENDAR_QUERY',
+                confidence: 0.92,
+                urgencyLevel: 'LOW',
+                entities: {
+                  dateReferences: ['next week'],
+                  eventTypes: ['general'],
+                },
+                reasoning: 'User asking about upcoming events',
+                shouldEscalate: false,
+              }),
+            },
           },
         ],
       });
@@ -71,13 +74,13 @@ describe('IntentClassifier', () => {
 
     it('should classify policy questions correctly', async () => {
       mockCreate.mockResolvedValueOnce({
-        content: [
+        choices: [
           {
-            type: 'text',
-            text: JSON.stringify({
-              category: 'POLICY_QUESTION',
-              confidence: 0.88,
-              urgencyLevel: 'LOW',
+            message: {
+              content: JSON.stringify({
+                category: 'POLICY_QUESTION',
+                confidence: 0.88,
+                urgencyLevel: 'LOW',
               entities: {
                 policyTopics: ['attendance', 'tardiness'],
               },

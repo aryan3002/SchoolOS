@@ -86,7 +86,7 @@ All tests passing:
 
 To run the app without API keys:
 
-1. Remove or comment out `ANTHROPIC_API_KEY` in `.env`
+1. Remove or comment out `OPENAI_API_KEY` in `.env`
 2. Start the API: `npm run dev` (in apps/api)
 3. Chat requests will use stub implementations
 4. No crashes or errors

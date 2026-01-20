@@ -48,7 +48,7 @@ async function main() {
 
   const mockConfig = {
     get: (key: string) => {
-      if (key === 'ANTHROPIC_API_KEY') {
+      if (key === 'OPENAI_API_KEY') {
         return undefined; // Simulate no API key
       }
       return undefined;

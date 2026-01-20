@@ -20,11 +20,13 @@ import {
   EscalationReason,
 } from '@schoolos/ai';
 
-// Mock Anthropic client
-vi.mock('@anthropic-ai/sdk', () => ({
+// Mock OpenAI client
+vi.mock('openai', () => ({
   default: vi.fn().mockImplementation(() => ({
-    messages: {
-      create: vi.fn(),
+    chat: {
+      completions: {
+        create: vi.fn(),
+      },
     },
   })),
 }));
@@ -126,11 +128,11 @@ describe('ToolRouter', () => {
     registry.register(new MockEscalationTool());
 
     router = new ToolRouter(registry, {
-      anthropicApiKey: 'test-api-key',
+      openaiApiKey: 'test-api-key',
     });
 
-    const Anthropic = require('@anthropic-ai/sdk').default;
-    mockCreate = Anthropic.mock.results[0].value.messages.create;
+    const OpenAI = require('openai').default;
+    mockCreate = OpenAI.mock.results[0].value.chat.completions.create;
   });
 
   describe('route', () => {
