@@ -5,6 +5,7 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { apiGet, apiPost } from '../lib/api';
 
 // Types
 export type ActionUrgency = 'low' | 'medium' | 'high' | 'critical';
@@ -43,9 +44,6 @@ export interface ActionFilters {
   type?: ActionType[];
 }
 
-// API base URL
-const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001/api';
-
 // API functions
 async function fetchActions(filters: ActionFilters): Promise<ActionItem[]> {
   const params = new URLSearchParams();
@@ -55,17 +53,7 @@ async function fetchActions(filters: ActionFilters): Promise<ActionItem[]> {
   if (filters.urgency) filters.urgency.forEach((u) => params.append('urgency', u));
   if (filters.type) filters.type.forEach((t) => params.append('type', t));
 
-  const response = await fetch(`${API_BASE}/actions?${params.toString()}`, {
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error('Failed to fetch actions');
-  }
-
-  const data = await response.json();
+  const data = await apiGet<any[]>(`/actions?${params.toString()}`);
   
   // Parse dates
   return data.map((action: any) => ({
@@ -77,17 +65,7 @@ async function fetchActions(filters: ActionFilters): Promise<ActionItem[]> {
 }
 
 async function fetchAction(actionId: string): Promise<ActionItem> {
-  const response = await fetch(`${API_BASE}/actions/${actionId}`, {
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error('Failed to fetch action');
-  }
-
-  const data = await response.json();
+  const data = await apiGet<any>(`/actions/${actionId}`);
   return {
     ...data,
     deadline: data.deadline ? new Date(data.deadline) : undefined,
@@ -96,36 +74,18 @@ async function fetchAction(actionId: string): Promise<ActionItem> {
   };
 }
 
-async function completeAction(
-  actionId: string,
-  quickActionId?: string
-): Promise<ActionItem> {
-  const response = await fetch(`${API_BASE}/actions/${actionId}/complete`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ quickActionId }),
-  });
-
-  if (!response.ok) {
-    throw new Error('Failed to complete action');
-  }
-
-  return response.json();
+async function completeAction(actionId: string): Promise<ActionItem> {
+  const data = await apiPost<any>(`/actions/${actionId}/complete`);
+  return {
+    ...data,
+    deadline: data.deadline ? new Date(data.deadline) : undefined,
+    createdAt: new Date(data.createdAt),
+    completedAt: data.completedAt ? new Date(data.completedAt) : undefined,
+  };
 }
 
 async function dismissAction(actionId: string): Promise<void> {
-  const response = await fetch(`${API_BASE}/actions/${actionId}/dismiss`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error('Failed to dismiss action');
-  }
+  await apiPost(`/actions/${actionId}/dismiss`);
 }
 
 // Hooks

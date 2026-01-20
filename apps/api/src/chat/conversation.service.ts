@@ -26,6 +26,8 @@ import {
   ConversationMessage,
   IntentCategory,
   SafetyCheckResult,
+  ToolResult,
+  GeneratedResponse,
 } from '@schoolos/ai';
 import { HybridSearchService } from '../knowledge/search/hybrid-search.service';
 import { $Enums } from '@prisma/client';
@@ -128,6 +130,86 @@ class MockEscalationService {
 }
 
 // ============================================================
+// STUB IMPLEMENTATIONS (for no API key)
+// ============================================================
+
+class StubIntentClassifier {
+  async classify(
+    _message: string,
+    _userContext: UserContext,
+    _conversationContext: ConversationContext,
+  ): Promise<ClassifiedIntent> {
+    return {
+      category: 'general',
+      confidence: 0.5,
+      urgency: 'low',
+      entities: {},
+      requiresTools: false,
+      shouldEscalate: false,
+    };
+  }
+}
+
+class StubToolRouter {
+  async route(
+    _intent: ClassifiedIntent,
+    _userContext: UserContext,
+    _conversationContext: ConversationContext,
+  ) {
+    return {
+      selectedTools: [],
+      reasoning: 'AI limited mode - no tools available',
+      priority: 'low' as const,
+    };
+  }
+
+  async execute(
+    _selectedTools: any[],
+    _userContext: UserContext,
+    _conversationContext: ConversationContext,
+  ) {
+    return {
+      toolResults: [] as ToolResult[],
+      requiresFollowUp: false,
+    };
+  }
+}
+
+class StubResponseGenerator {
+  async generate(
+    _intent: ClassifiedIntent,
+    _toolResults: ToolResult[],
+    _userContext: UserContext,
+    _conversationContext: ConversationContext,
+  ): Promise<GeneratedResponse> {
+    return {
+      content: '⚠️ AI Limited Mode: The AI service is currently in limited mode. Full AI capabilities require API configuration. Your message has been received, but automated intelligent responses are unavailable at this time.',
+      confidence: 0.5,
+      citations: [],
+      suggestedFollowUps: ['Contact an administrator for assistance'],
+    } as GeneratedResponse;
+  }
+}
+
+class StubSafetyGuardrails {
+  async checkInput(_message: string, _userContext: UserContext): Promise<SafetyCheckResult> {
+    return {
+      passed: true,
+      violations: [],
+      sanitizedContent: undefined,
+    };
+  }
+
+  async checkOutput(_content: string, _userContext: UserContext): Promise<SafetyCheckResult> {
+    return {
+      passed: true,
+      violations: [],
+      sanitizedContent: undefined,
+    };
+  }
+}
+
+// ============================================================
 // CONVERSATION SERVICE
 // ============================================================
 
@@ -158,7 +240,8 @@ export class ConversationService implements OnModuleInit {
     const anthropicApiKey = this.configService.get<string>('ANTHROPIC_API_KEY');
 
     if (!anthropicApiKey) {
-      this.logger.warn('ANTHROPIC_API_KEY not configured - AI features will be limited');
+      this.logger.warn('ANTHROPIC_API_KEY not configured - using stub AI implementations');
+      this.initializeStubComponents();
       return;
     }
 
@@ -203,6 +286,18 @@ export class ConversationService implements OnModuleInit {
     });
 
     this.logger.log('AI components initialized successfully');
+  }
+
+  /**
+   * Initialize stub components when no API key is available
+   */
+  private initializeStubComponents() {
+    this.intentClassifier = new StubIntentClassifier() as any;
+    this.toolRouter = new StubToolRouter() as any;
+    this.responseGenerator = new StubResponseGenerator() as any;
+    this.safetyGuardrails = new StubSafetyGuardrails() as any;
+    
+    this.logger.log('Stub AI components initialized - limited mode active');
   }
 
   /**

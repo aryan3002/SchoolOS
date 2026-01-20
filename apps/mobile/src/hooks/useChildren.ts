@@ -5,6 +5,7 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { apiGet } from '../lib/api';
 
 // Types
 export interface Child {
@@ -60,44 +61,17 @@ export interface AttendanceRecord {
   note?: string;
 }
 
-// API base URL
-const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001/api';
-
 // API functions
 async function fetchChildren(): Promise<Child[]> {
-  const response = await fetch(`${API_BASE}/students/children`, {
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error('Failed to fetch children');
-  }
-
-  return response.json();
+  return apiGet<Child[]>('/students/children');
 }
 
 async function fetchChild(childId: string): Promise<Child> {
-  const response = await fetch(`${API_BASE}/students/${childId}`, {
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error('Failed to fetch child');
-  }
-
-  return response.json();
+  return apiGet<Child>(`/students/${childId}`);
 }
 
 async function fetchGrades(childId: string): Promise<Grade[]> {
-  const response = await fetch(`${API_BASE}/students/${childId}/grades`, {
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  });
+  return apiGet<Grade[]>(`/students/${childId}/grades`);
 
   if (!response.ok) {
     throw new Error('Failed to fetch grades');
@@ -110,35 +84,12 @@ async function fetchAssignments(
   childId: string,
   status?: Assignment['status']
 ): Promise<Assignment[]> {
-  const url = status
-    ? `${API_BASE}/students/${childId}/assignments?status=${status}`
-    : `${API_BASE}/students/${childId}/assignments`;
-
-  const response = await fetch(url, {
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error('Failed to fetch assignments');
-  }
-
-  return response.json();
+  const query = status ? `?status=${status}` : '';
+  return apiGet<Assignment[]>(`/students/${childId}/assignments${query}`);
 }
 
 async function fetchAttendance(childId: string): Promise<Attendance> {
-  const response = await fetch(`${API_BASE}/students/${childId}/attendance`, {
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error('Failed to fetch attendance');
-  }
-
-  return response.json();
+  return apiGet<Attendance>(`/students/${childId}/attendance`);
 }
 
 // Hooks

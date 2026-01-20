@@ -5,6 +5,7 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { apiGet, apiPost } from '../lib/api';
 
 // Types
 export interface Message {
@@ -47,57 +48,21 @@ export interface SendMessageResponse {
   conversationId: string;
 }
 
-// API base URL - would come from env
-const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001/api';
-
 // API functions
 async function fetchConversation(conversationId: string): Promise<Conversation> {
-  const response = await fetch(`${API_BASE}/chat/conversations/${conversationId}`, {
-    headers: {
-      'Content-Type': 'application/json',
-      // Auth header would be added by interceptor
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error('Failed to fetch conversation');
-  }
-
-  return response.json();
+  return apiGet<Conversation>(`/chat/conversations/${conversationId}`);
 }
 
 async function fetchConversations(childId?: string): Promise<Conversation[]> {
   const url = childId
-    ? `${API_BASE}/chat/conversations?childId=${childId}`
-    : `${API_BASE}/chat/conversations`;
+    ? `/chat/conversations?childId=${childId}`
+    : `/chat/conversations`;
 
-  const response = await fetch(url, {
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error('Failed to fetch conversations');
-  }
-
-  return response.json();
+  return apiGet<Conversation[]>(url);
 }
 
 async function sendMessage(input: SendMessageInput): Promise<SendMessageResponse> {
-  const response = await fetch(`${API_BASE}/chat/message`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(input),
-  });
-
-  if (!response.ok) {
-    throw new Error('Failed to send message');
-  }
-
-  return response.json();
+  return apiPost<SendMessageResponse>('/chat/message', input);
 }
 
 // Hooks
@@ -139,15 +104,26 @@ export function useSendMessage() {
 export function useStreamingMessage() {
   return useMutation({
     mutationFn: async (input: SendMessageInput) => {
+      // Note: Streaming requires custom handling - using apiPost would read the full response
+      // For streaming, we need direct fetch with auth headers
+      const { useAppStore } = await import('../store/appStore');
+      const token = useAppStore.getState().token;
+      const { API_BASE } = await import('../lib/api');
+      
       const response = await fetch(`${API_BASE}/chat/message/stream`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...(token && { 'Authorization': `Bearer ${token}` }),
         },
         body: JSON.stringify(input),
       });
 
       if (!response.ok) {
+        if (response.status === 401) {
+          useAppStore.getState().logout();
+          throw new Error('Session expired. Please log in again.');
+        }
         throw new Error('Failed to start streaming');
       }
 

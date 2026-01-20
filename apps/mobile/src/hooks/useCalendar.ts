@@ -5,6 +5,7 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { apiGet } from '../lib/api';
 
 // Types
 export interface CalendarEvent {
@@ -36,9 +37,6 @@ export interface CalendarFilters {
   types?: CalendarEvent['type'][];
 }
 
-// API base URL
-const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001/api';
-
 // API functions
 async function fetchEvents(filters: CalendarFilters): Promise<CalendarEvent[]> {
   const params = new URLSearchParams();
@@ -48,17 +46,7 @@ async function fetchEvents(filters: CalendarFilters): Promise<CalendarEvent[]> {
   if (filters.endDate) params.append('endDate', filters.endDate.toISOString());
   if (filters.types) filters.types.forEach((type) => params.append('types', type));
 
-  const response = await fetch(`${API_BASE}/calendar/events?${params.toString()}`, {
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error('Failed to fetch events');
-  }
-
-  const data = await response.json();
+  const data = await apiGet<any[]>(`/calendar/events?${params.toString()}`);
   
   // Parse dates
   return data.map((event: any) => ({
@@ -76,17 +64,7 @@ async function fetchEvents(filters: CalendarFilters): Promise<CalendarEvent[]> {
 }
 
 async function fetchEvent(eventId: string): Promise<CalendarEvent> {
-  const response = await fetch(`${API_BASE}/calendar/events/${eventId}`, {
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error('Failed to fetch event');
-  }
-
-  const data = await response.json();
+  const data = await apiGet<any>(`/calendar/events/${eventId}`);
   return {
     ...data,
     date: new Date(data.date),
@@ -108,17 +86,7 @@ async function fetchUpcomingEvents(
     limit: limit.toString(),
   });
 
-  const response = await fetch(`${API_BASE}/calendar/events?${params.toString()}`, {
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error('Failed to fetch upcoming events');
-  }
-
-  const data = await response.json();
+  const data = await apiGet<any[]>(`/calendar/events?${params.toString()}`);
   return data.map((event: any) => ({
     ...event,
     date: new Date(event.date),
