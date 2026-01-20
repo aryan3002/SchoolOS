@@ -85,9 +85,15 @@ export abstract class BaseTool implements ITool {
       const result = await this.executeImpl(params);
 
       return {
-        ...result,
-        toolName: this.definition.name,
-        executionTimeMs: Date.now() - startTime,
+        success: result.success,
+        content: result.content,
+        citations: result.citations || [],
+        metadata: {
+          toolName: this.definition.name,
+          executionTimeMs: Date.now() - startTime,
+          confidence: result.confidence,
+          ...result.metadata,
+        },
       };
     } catch (error) {
       return this.createErrorResult(
@@ -185,11 +191,14 @@ export abstract class BaseTool implements ITool {
   protected createErrorResult(code: string, message: string, startTime: number): ToolResult {
     return {
       success: false,
-      toolName: this.definition.name,
       content: '',
-      confidence: 0,
-      error: `${code}: ${message}`,
-      executionTimeMs: Date.now() - startTime,
+      citations: [],
+      metadata: {
+        toolName: this.definition.name,
+        executionTimeMs: Date.now() - startTime,
+        confidence: 0,
+        error: `${code}: ${message}`,
+      },
     };
   }
 
@@ -199,19 +208,23 @@ export abstract class BaseTool implements ITool {
   protected createSuccessResult(
     content: string,
     options: {
-      data?: Record<string, unknown>;
-      source?: ToolResult['source'];
+      citations?: Array<{ sourceId: string; title: string; excerpt?: string }>;
       confidence?: number;
-      citations?: Citation[];
+      data?: Record<string, unknown>;
+      sourceType?: string;
+      relevanceScore?: number;
     } = {},
-  ): Omit<ToolResult, 'toolName' | 'executionTimeMs'> {
+  ): Omit<ToolResult, 'metadata'> {
     return {
       success: true,
       content,
-      data: options.data,
-      source: options.source,
-      confidence: options.confidence ?? 0.9,
-      citations: options.citations,
+      citations: options.citations || [],
+      metadata: {
+        confidence: options.confidence ?? 0.9,
+        data: options.data,
+        sourceType: options.sourceType,
+        relevanceScore: options.relevanceScore,
+      },
     };
   }
 
@@ -220,7 +233,7 @@ export abstract class BaseTool implements ITool {
    */
   protected abstract executeImpl(
     params: ToolParams,
-  ): Promise<Omit<ToolResult, 'toolName' | 'executionTimeMs'>>;
+  ): Promise<Omit<ToolResult, 'metadata'> & { confidence?: number; metadata?: Record<string, unknown> }>;
 }
 
 // ============================================================

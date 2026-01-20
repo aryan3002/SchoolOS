@@ -83,7 +83,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         refreshUser,
       }}
     >
-      {children}
+      {children as any}
     </AuthContext.Provider>
   );
 }

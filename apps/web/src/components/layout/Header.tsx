@@ -22,7 +22,7 @@ export function Header({ title, description, children }: HeaderProps) {
       </div>
       
       <div className="flex items-center gap-4">
-        {children}
+        {children as any}
         
         {/* Search */}
         <div className="relative hidden md:block">

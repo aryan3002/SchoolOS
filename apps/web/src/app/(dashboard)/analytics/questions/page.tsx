@@ -205,7 +205,7 @@ export default function QuestionsPage() {
             {/* Questions List */}
             <div className="space-y-2">
               {filteredQuestions.map((q) => {
-                const StatusIcon = statusConfig[q.status].icon;
+                const StatusIcon = statusConfig[q.status as keyof typeof statusConfig]?.icon;
                 return (
                   <Card 
                     key={q.id}
@@ -238,9 +238,9 @@ export default function QuestionsPage() {
                                 <ThumbsDown className="h-4 w-4 text-red-600" />
                               )
                             )}
-                            <Badge variant={statusConfig[q.status].variant}>
+                            <Badge variant={statusConfig[q.status as keyof typeof statusConfig]?.variant}>
                               <StatusIcon className="mr-1 h-3 w-3" />
-                              {statusConfig[q.status].label}
+                              {statusConfig[q.status as keyof typeof statusConfig]?.label}
                             </Badge>
                           </div>
                         </div>

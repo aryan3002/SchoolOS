@@ -145,7 +145,7 @@ export class ToolRouter {
         selectedTools: [],
         reasoning: 'No tools available for this intent with current user permissions',
         requiresEscalation: true,
-        escalationReason: EscalationReason.AUTHORIZATION_REQUIRED,
+        escalationReason: EscalationReason.TECHNICAL_ERROR,
       };
     }
 
@@ -248,23 +248,13 @@ export class ToolRouter {
       };
     }
 
-    // Critical urgency escalates
-    if (intent.urgencyLevel === UrgencyLevel.CRITICAL) {
+    // High urgency with safety concern escalates
+    if (intent.urgency === 'high' && intent.shouldEscalate) {
       return {
         selectedTools: [],
-        reasoning: 'Critical urgency - escalating to human agent',
+        reasoning: 'High urgency with safety concern - escalating to human agent',
         requiresEscalation: true,
-        escalationReason: EscalationReason.SAFETY_CONCERN,
-      };
-    }
-
-    // Explicit human agent request
-    if (intent.category === IntentCategory.HUMAN_AGENT_REQUEST) {
-      return {
-        selectedTools: [],
-        reasoning: 'User explicitly requested human agent',
-        requiresEscalation: true,
-        escalationReason: EscalationReason.USER_REQUEST,
+        escalationReason: EscalationReason.STUDENT_SAFETY,
       };
     }
 
@@ -526,12 +516,15 @@ Select the appropriate tool(s) and provide reasoning. Respond with JSON only.`;
       return await Promise.race([tool.execute(params), timeoutPromise]);
     } catch (error) {
       return {
-        toolName: tool.definition.name,
         success: false,
         content: '',
-        confidence: 0,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        executionTimeMs: timeoutMs,
+        citations: [],
+        metadata: {
+          toolName: tool.definition.name,
+          executionTimeMs: timeoutMs,
+          confidence: 0,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
       };
     }
   }
@@ -541,12 +534,15 @@ Select the appropriate tool(s) and provide reasoning. Respond with JSON only.`;
    */
   private createToolNotFoundResult(toolName: string): ToolResult {
     return {
-      toolName,
       success: false,
       content: '',
-      confidence: 0,
-      error: `Tool '${toolName}' not found`,
-      executionTimeMs: 0,
+      citations: [],
+      metadata: {
+        toolName,
+        executionTimeMs: 0,
+        confidence: 0,
+        error: `Tool '${toolName}' not found`,
+      },
     };
   }
 
@@ -559,8 +555,15 @@ Select the appropriate tool(s) and provide reasoning. Respond with JSON only.`;
     const successfulResults = results.filter((r) => r.success);
     if (successfulResults.length === 0) return 0;
 
+    // Extract confidence from metadata
+    const confidences = successfulResults
+      .map((r) => r.metadata?.confidence as number | undefined)
+      .filter((c): c is number => typeof c === 'number');
+
+    if (confidences.length === 0) return 0.5; // Default
+
     // Weighted average based on success
-    const totalConfidence = successfulResults.reduce((sum, r) => sum + r.confidence, 0);
-    return totalConfidence / successfulResults.length;
+    const totalConfidence = confidences.reduce((sum, c) => sum + c, 0);
+    return totalConfidence / confidences.length;
   }
 }

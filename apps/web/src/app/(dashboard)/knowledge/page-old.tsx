@@ -269,7 +269,7 @@ export default function KnowledgePage() {
           <CardContent>
             <div className="space-y-2">
               {filteredDocs.map((doc) => {
-                const StatusIcon = statusConfig[doc.status].icon;
+                const StatusIcon = statusConfig[doc.status as keyof typeof statusConfig]?.icon;
                 return (
                   <div
                     key={doc.id}
@@ -281,9 +281,9 @@ export default function KnowledgePage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <h3 className="font-medium truncate">{doc.title}</h3>
-                        <Badge variant={statusConfig[doc.status].variant}>
+                        <Badge variant={statusConfig[doc.status as keyof typeof statusConfig]?.variant}>
                           <StatusIcon className="mr-1 h-3 w-3" />
-                          {statusConfig[doc.status].label}
+                          {statusConfig[doc.status as keyof typeof statusConfig]?.label}
                         </Badge>
                       </div>
                       <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">

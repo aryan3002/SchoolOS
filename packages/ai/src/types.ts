@@ -107,38 +107,44 @@ export interface ExtractedEntities {
 }
 
 /**
- * Result of intent classification
+ * Result of intent classification (CANONICAL INTERFACE)
+ * 
+ * This is the single source of truth for intent classification across the monorepo.
+ * All components must use this exact shape.
  */
 export interface ClassifiedIntent {
-  /** Primary intent category */
-  intent: IntentCategory;
+  /** Primary intent category (canonical field name) */
+  category: IntentCategory;
 
   /** Secondary/fallback intent if applicable */
-  secondaryIntent?: IntentCategory;
+  secondaryCategory?: IntentCategory;
 
-  /** Confidence score 0-1 */
+  /** Confidence score 0-1 (canonical) */
   confidence: number;
 
-  /** Extracted entities from the message */
-  entities: ExtractedEntities;
+  /** Urgency level (canonical: 'low' | 'medium' | 'high') */
+  urgency: 'low' | 'medium' | 'high';
+
+  /** Extracted entities from the message (optional structured data) */
+  entities?: ExtractedEntities;
+
+  /** Whether this query requires tools to answer (canonical) */
+  requiresTools: boolean;
 
   /** Whether this query requires student-specific context/permissions */
-  requiresStudentContext: boolean;
-
-  /** Urgency level */
-  urgency: UrgencyLevel;
+  requiresStudentContext?: boolean;
 
   /** Whether escalation to human is recommended */
-  shouldEscalate: boolean;
+  shouldEscalate?: boolean;
 
   /** Reasoning for the classification */
-  reasoning: string;
+  reasoning?: string;
 
   /** Original query for reference */
-  originalQuery: string;
+  originalQuery?: string;
 
   /** Timestamp of classification */
-  classifiedAt: Date;
+  classifiedAt?: Date;
 }
 
 // ============================================================
@@ -292,50 +298,54 @@ export interface ToolParams {
 }
 
 /**
- * Result of a tool execution
+ * Result of a tool execution (CANONICAL INTERFACE)
+ * 
+ * This is the single source of truth for tool results across the monorepo.
+ * All tools must return this exact shape.
  */
 export interface ToolResult {
-  /** Whether the tool executed successfully */
+  /** Whether the tool executed successfully (canonical) */
   success: boolean;
 
-  /** Name of the tool that was executed */
-  toolName: string;
-
-  /** Retrieved/generated content */
+  /** Retrieved/generated content (canonical) */
   content: string;
 
-  /** Structured data (tool-specific) */
-  data?: Record<string, unknown>;
-
-  /** Source of the information */
-  source?: {
-    /** Source ID */
-    id: string;
-
-    /** Source title */
+  /** Citations array with structured source information (canonical) */
+  citations: Array<{
+    sourceId: string;
     title: string;
+    excerpt?: string;
+  }>;
+
+  /** Optional metadata for tool-specific data */
+  metadata?: {
+    /** Name of the tool that was executed */
+    toolName?: string;
+
+    /** Confidence in the result */
+    confidence?: number;
 
     /** Source type */
-    type: string;
+    sourceType?: string;
 
     /** URL or reference */
     url?: string;
 
     /** Relevance score */
     relevanceScore?: number;
+
+    /** Execution time in ms */
+    executionTimeMs?: number;
+
+    /** Structured data (tool-specific) */
+    data?: Record<string, unknown>;
+
+    /** Error message if success is false */
+    error?: string;
+
+    /** Any other tool-specific fields */
+    [key: string]: unknown;
   };
-
-  /** Confidence in the result */
-  confidence: number;
-
-  /** Citations if applicable */
-  citations?: Citation[];
-
-  /** Error message if success is false */
-  error?: string;
-
-  /** Execution time in ms */
-  executionTimeMs: number;
 }
 
 /**
@@ -415,41 +425,23 @@ export interface GeneratedResponse {
   /** Confidence in the response */
   confidence: number;
 
-  /** Citations used in the response */
-  citations: Citation[];
-
-  /** Sources consulted */
-  sources: Array<{
-    id: string;
-    title: string;
-    type: string;
-    relevanceScore: number;
+  /** Citations used in the response (canonical citations array) */
+  citations: Array<{
+    sourceId: string;
+    sourceTitle?: string;
+    title?: string;
+    quote?: string;
+    excerpt?: string;
   }>;
 
-  /** Tools that were executed */
-  toolsUsed: string[];
-
-  /** Whether the response is complete or needs follow-up */
-  isComplete: boolean;
-
   /** Suggested follow-up questions */
-  followUpSuggestions?: string[];
+  suggestedFollowUps?: string[];
 
-  /** If not complete, what information is missing */
-  missingInformation?: string;
+  /** Whether human follow-up is required */
+  requiresFollowUp?: boolean;
 
-  /** Model used for generation */
-  modelUsed: string;
-
-  /** Token usage */
-  tokenUsage: {
-    prompt: number;
-    completion: number;
-    total: number;
-  };
-
-  /** Latency in ms */
-  latencyMs: number;
+  /** Additional metadata */
+  metadata?: Record<string, unknown>;
 }
 
 /**

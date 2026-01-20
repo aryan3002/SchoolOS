@@ -234,14 +234,17 @@ Respond with a JSON object containing:
   ): string {
     const toolResultsText = executionResult.toolResults
       .map((result) => {
+        const toolName = result.metadata?.toolName || 'unknown';
+        const confidence = result.metadata?.confidence || 0;
         if (result.success) {
-          return `[${result.toolName}] SUCCESS (confidence: ${result.confidence}):\n${result.content}${
-            result.citations
-              ? `\n\nCitations:\n${result.citations.map((c) => `- ${c.sourceTitle}: "${c.quote}"`).join('\n')}`
+          return `[${toolName}] SUCCESS (confidence: ${confidence}):\n${result.content}${
+            result.citations && result.citations.length > 0
+              ? `\n\nCitations:\n${result.citations.map((c) => `- ${c.title}: "${c.excerpt || ''}"`).join('\n')}`
               : ''
           }`;
         } else {
-          return `[${result.toolName}] FAILED: ${result.error}`;
+          const error = result.metadata?.error || 'Unknown error';
+          return `[${toolName}] FAILED: ${error}`;
         }
       })
       .join('\n\n---\n\n');
@@ -253,11 +256,11 @@ Respond with a JSON object containing:
           .join('\n')}\n`
       : '';
 
-    return `User's question: "${intent.originalQuery}"
+    return `User's question: "${intent.originalQuery || 'Unknown'}"
 
 Intent: ${intent.category} (confidence: ${intent.confidence})
-Urgency: ${intent.urgencyLevel}
-Entities: ${JSON.stringify(intent.entities)}
+Urgency: ${intent.urgency}
+Entities: ${JSON.stringify(intent.entities || {})}
 ${historyText}
 Tool results:
 ${toolResultsText}
@@ -299,7 +302,7 @@ Respond with JSON only.`;
 
       return {
         content: parsed.mainResponse,
-        citations: allCitations,
+        citations: allCitations as any,
         confidence: executionResult.combinedConfidence,
         suggestedFollowUps: this.includeSuggestedFollowUps
           ? parsed.suggestedFollowUps || []
@@ -307,7 +310,7 @@ Respond with JSON only.`;
         requiresFollowUp: executionResult.requiresFollowUp || parsed.clarificationNeeded || false,
         metadata: {
           intent: intent.category,
-          toolsUsed: executionResult.toolResults.map((r) => r.toolName),
+          toolsUsed: executionResult.toolResults.map((r) => r.metadata?.toolName || 'unknown'),
           processingTimeMs: executionResult.totalExecutionTimeMs,
         },
       };
@@ -315,13 +318,13 @@ Respond with JSON only.`;
       // If parsing fails, use the raw text
       return {
         content: text,
-        citations: executionResult.toolResults.flatMap((r) => r.citations || []),
+        citations: executionResult.toolResults.flatMap((r) => r.citations || []) as any,
         confidence: executionResult.combinedConfidence * 0.8, // Reduce confidence for fallback
         suggestedFollowUps: [],
         requiresFollowUp: executionResult.requiresFollowUp,
         metadata: {
           intent: intent.category,
-          toolsUsed: executionResult.toolResults.map((r) => r.toolName),
+          toolsUsed: executionResult.toolResults.map((r) => r.metadata?.toolName || 'unknown'),
           processingTimeMs: executionResult.totalExecutionTimeMs,
           parseError: true,
         },
@@ -367,13 +370,13 @@ Respond with JSON only.`;
   ): GeneratedResponse {
     const errorMessages = executionResult.toolResults
       .filter((r) => !r.success)
-      .map((r) => r.error)
+      .map((r) => r.metadata?.error)
       .filter(Boolean);
 
     // Determine appropriate fallback message
     let content: string;
 
-    if (intent.urgencyLevel === UrgencyLevel.CRITICAL || intent.urgencyLevel === UrgencyLevel.HIGH) {
+    if (intent.urgency === 'high') {
       content =
         "I'm having difficulty retrieving the information you need right now. " +
         'Given the urgency of your request, I recommend contacting the school office directly.\n\n' +
@@ -408,7 +411,7 @@ Respond with JSON only.`;
       requiresFollowUp: true,
       metadata: {
         intent: intent.category,
-        toolsUsed: executionResult.toolResults.map((r) => r.toolName),
+        toolsUsed: executionResult.toolResults.map((r) => r.metadata?.toolName || 'unknown'),
         processingTimeMs: executionResult.totalExecutionTimeMs,
         fallback: true,
         errors: errorMessages,

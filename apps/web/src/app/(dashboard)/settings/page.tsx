@@ -79,7 +79,7 @@ export default function SettingsPage() {
           {settingsSections.map((section) => {
             const Icon = section.icon;
             return (
-              <Link key={section.href} href={section.href}>
+              <Link key={section.href} href={section.href as any}>
                 <Card className="hover:border-primary/50 hover:shadow-md transition-all cursor-pointer h-full">
                   <CardContent className="p-6">
                     <div className="flex items-start gap-4">

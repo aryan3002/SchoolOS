@@ -21,7 +21,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        {children}
+        {children as any}
+        {/* @ts-ignore */}
         <Toaster position="top-right" richColors />
       </AuthProvider>
     </QueryClientProvider>

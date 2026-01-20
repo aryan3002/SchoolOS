@@ -20,9 +20,7 @@ import { z } from 'zod';
 
 import {
   IntentCategory,
-  UrgencyLevel,
   ClassifiedIntent,
-  ExtractedEntities,
   ConversationContext,
 } from '../types';
 
@@ -89,9 +87,9 @@ const ClassificationResponseSchema = z.object({
   intent: z.nativeEnum(IntentCategory),
   secondaryIntent: z.nativeEnum(IntentCategory).optional(),
   confidence: z.number().min(0).max(1),
-  entities: ExtractedEntitiesSchema,
+  entities: ExtractedEntitiesSchema.optional(),
   requiresStudentContext: z.boolean(),
-  urgency: z.nativeEnum(UrgencyLevel),
+  urgency: z.enum(['low', 'medium', 'high']),
   shouldEscalate: z.boolean(),
   reasoning: z.string(),
 });
@@ -145,9 +143,21 @@ export class IntentClassifier {
       // Apply escalation rules
       const shouldEscalate = this.shouldEscalate(classification, context);
 
+      // Map urgency from response (could be 'critical' in old responses)
+      const canonicalUrgency: 'low' | 'medium' | 'high' = 
+        classification.urgency === 'low' ? 'low' :
+        classification.urgency === 'medium' ? 'medium' : 'high';
+
       const result: ClassifiedIntent = {
-        ...classification,
+        category: classification.intent,
+        secondaryCategory: classification.secondaryIntent,
+        confidence: classification.confidence,
+        urgency: canonicalUrgency,
+        entities: classification.entities || undefined,
+        requiresTools: this.determineRequiresTools(classification.intent),
+        requiresStudentContext: classification.requiresStudentContext,
         shouldEscalate,
+        reasoning: classification.reasoning,
         originalQuery: message,
         classifiedAt: new Date(),
       };
@@ -168,11 +178,12 @@ export class IntentClassifier {
       console.error('[IntentClassifier] Classification error:', error);
 
       return {
-        intent: IntentCategory.UNKNOWN,
+        category: IntentCategory.UNKNOWN,
         confidence: 0,
+        urgency: 'low',
         entities: {},
+        requiresTools: false,
         requiresStudentContext: false,
-        urgency: UrgencyLevel.LOW,
         shouldEscalate: true, // Escalate on error
         reasoning: `Classification failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
         originalQuery: message,
@@ -231,7 +242,7 @@ Respond with ONLY valid JSON in this exact format:
     "custom": { "key": "value" }
   },
   "requiresStudentContext": true,
-  "urgency": "low|medium|high|critical",
+  "urgency": "low|medium|high",
   "shouldEscalate": false,
   "reasoning": "Brief explanation of why this classification was chosen"
 }`;
@@ -333,8 +344,7 @@ Respond with ONLY valid JSON in this exact format:
     // Escalate complaints with high urgency
     if (
       classification.intent === IntentCategory.COMPLAINT &&
-      (classification.urgency === UrgencyLevel.HIGH ||
-        classification.urgency === UrgencyLevel.CRITICAL)
+      classification.urgency === 'high'
     ) {
       return true;
     }
@@ -369,6 +379,19 @@ Respond with ONLY valid JSON in this exact format:
         pattern.test(classification.reasoning) ||
         pattern.test(JSON.stringify(classification.entities)),
     );
+  }
+
+  /**
+   * Determine if tools are required for this intent category
+   */
+  private determineRequiresTools(intent: IntentCategory): boolean {
+    // Intents that can be answered without tools
+    const noToolsRequired = new Set([
+      IntentCategory.UNKNOWN,
+      IntentCategory.EMERGENCY, // Goes straight to escalation
+    ]);
+
+    return !noToolsRequired.has(intent);
   }
 
   /**

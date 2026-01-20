@@ -280,7 +280,7 @@ export default function KnowledgePage() {
             ) : (
               <div className="space-y-2">
                 {filteredDocs.map((doc) => {
-                  const config = statusConfig[doc.status] || statusConfig.DRAFT;
+                  const config = statusConfig[doc.status as keyof typeof statusConfig] || statusConfig.DRAFT;
                   const StatusIcon = config.icon;
                   return (
                     <div

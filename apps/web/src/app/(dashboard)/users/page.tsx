@@ -269,7 +269,7 @@ export default function UsersPage() {
               <CardContent>
                 <div className="space-y-2">
                   {filteredAdmins.map((admin) => {
-                    const StatusIcon = statusConfig[admin.status].icon;
+                    const StatusIcon = statusConfig[admin.status as keyof typeof statusConfig]?.icon;
                     const roleInfo = roles.find(r => r.name === admin.role);
                     return (
                       <div
@@ -283,9 +283,9 @@ export default function UsersPage() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <h3 className="font-medium">{admin.name}</h3>
-                            <Badge variant={statusConfig[admin.status].variant}>
+                            <Badge variant={statusConfig[admin.status as keyof typeof statusConfig]?.variant}>
                               <StatusIcon className="mr-1 h-3 w-3" />
-                              {statusConfig[admin.status].label}
+                              {statusConfig[admin.status as keyof typeof statusConfig]?.label}
                             </Badge>
                           </div>
                           <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">

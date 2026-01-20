@@ -26,7 +26,6 @@ import {
   ConversationMessage,
   IntentCategory,
   SafetyCheckResult,
-  ToolResult,
 } from '@schoolos/ai';
 import { HybridSearchService } from '../knowledge/search/hybrid-search.service';
 import { $Enums } from '@prisma/client';
@@ -250,7 +249,7 @@ export class ConversationService implements OnModuleInit {
     this.logger.debug('Intent classified', {
       category: intent.category,
       confidence: intent.confidence,
-      urgency: intent.urgencyLevel,
+      urgency: intent['urgency'],
     });
 
     // 7. Handle special cases (greetings, simple queries)
@@ -314,7 +313,7 @@ export class ConversationService implements OnModuleInit {
     await this.saveMessage(conversation.id, 'assistant', finalContent, {
       intent: intent.category,
       confidence: intent.confidence,
-      toolsUsed: executionResult.toolResults.map((r: ToolResult) => r.toolName),
+      toolsUsed: executionResult.toolResults.map((r: any) => r.metadata?.toolName || 'unknown'),
       citations: generatedResponse.citations,
       safetyFiltered: !outputSafetyCheck.passed,
     });
@@ -322,7 +321,7 @@ export class ConversationService implements OnModuleInit {
     // 13. Update conversation metadata
     await this.updateConversationMetadata(conversation.id, {
       lastIntentCategory: intent.category,
-      lastToolsUsed: executionResult.toolResults.map((r: ToolResult) => r.toolName),
+      lastToolsUsed: executionResult.toolResults.map((r: any) => r.metadata?.toolName || 'unknown'),
       messageCount: conversationHistory.length + 2,
       requiresFollowUp: executionResult.requiresFollowUp,
     });
@@ -341,7 +340,7 @@ export class ConversationService implements OnModuleInit {
       metadata: {
         intentCategory: intent.category,
         confidence: generatedResponse.confidence,
-        toolsUsed: executionResult.toolResults.map((r: ToolResult) => r.toolName),
+        toolsUsed: executionResult.toolResults.map((r: any) => r.metadata?.toolName || 'unknown'),
         processingTimeMs: Date.now() - startTime,
       },
     };

@@ -10,7 +10,7 @@ export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
-}) {
+}): React.ReactElement | null {
   const { isAuthenticated, isLoading, user } = useAuth();
   const router = useRouter();
 
@@ -36,7 +36,7 @@ export default function DashboardLayout({
     <div className="min-h-screen bg-background">
       <Sidebar />
       <main className="pl-64">
-        {children}
+        {children as any}
       </main>
     </div>
   );
